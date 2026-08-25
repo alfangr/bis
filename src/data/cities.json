@@ -1,0 +1,19 @@
+{
+  "cities": [
+    {
+      "id": "CITY001",
+      "name": "Malang",
+      "province": "Jawa Timur"
+    },
+    {
+      "id": "CITY002",
+      "name": "Bojonegoro",
+      "province": "Jawa Timur"
+    },
+    {
+      "id": "CITY003",
+      "name": "Surabaya",
+      "province": "Jawa Timur"
+    }
+  ]
+}
