@@ -6,7 +6,7 @@ export interface BusSeats {
 export interface Bus {
   id: string;
   poName: string;
-  poPhone?: string;
+  poPhone: string;
   class: string;
   from: string;
   to: string;
@@ -14,8 +14,8 @@ export interface Bus {
   arrival: string;
   duration?: string;
   price: number;
-  seats?: BusSeats;
-  amenities?: string[];
+  seats: BusSeats;
+  amenities: string[];
   stops?: string[];
 }
 

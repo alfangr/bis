@@ -46,12 +46,16 @@ export async function POST(req: Request): Promise<NextResponse<Bus | { error: st
     const newBus: Bus = {
       id: generateId('BIS', buses),
       poName: poName.trim(),
+      poPhone: '',
       class: busClass.trim(),
       from: from.trim(),
       to: to.trim(),
       departure: departure.trim(),
       arrival: arrival.trim(),
+      duration: '',
       price,
+      seats: { available: 0, total: 0 },
+      amenities: [],
     };
 
     buses.push(newBus);
