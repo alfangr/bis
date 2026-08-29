@@ -2,7 +2,7 @@ import { BRAND_NAME, STATS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bus, MapPin, Route as RouteIcon, Search, ArrowRight } from 'lucide-react';
+import { Bus, MapPin, Search, ArrowRight } from 'lucide-react';
 
 export const Footer = () => {
   const year = new Date().getFullYear();
@@ -47,17 +47,6 @@ export const Footer = () => {
                   Cari Bis
                 </a>
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                asChild
-                className="w-fit justify-start px-2 text-slate-300 hover:text-white hover:bg-white/5"
-              >
-                <a href="#rute" className="gap-2">
-                  <RouteIcon className="h-4 w-4" />
-                  Rute Populer
-                </a>
-              </Button>
             </div>
           </div>
 
@@ -65,7 +54,7 @@ export const Footer = () => {
             <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white">
               Cakupan
             </h4>
-            <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/5 p-3">
                 <div className="flex items-center gap-1.5 text-primary">
                   <MapPin className="h-3.5 w-3.5" />
@@ -79,13 +68,6 @@ export const Footer = () => {
                   <span className="text-lg font-bold text-white">{STATS.buses}</span>
                 </div>
                 <span className="text-slate-400">Jadwal</span>
-              </div>
-              <div className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-1.5 text-primary">
-                  <RouteIcon className="h-3.5 w-3.5" />
-                  <span className="text-lg font-bold text-white">{STATS.routes}</span>
-                </div>
-                <span className="text-slate-400">Rute</span>
               </div>
             </div>
           </div>

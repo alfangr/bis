@@ -4,7 +4,6 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://bis.informa
 export const STATS = {
   cities: 10,
   buses: 14,
-  routes: 6,
   operators: 14,
 };
 

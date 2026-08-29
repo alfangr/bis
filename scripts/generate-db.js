@@ -12,16 +12,6 @@ CREATE TABLE cities (
   province TEXT NOT NULL
 );
 
-CREATE TABLE routes (
-  id          TEXT PRIMARY KEY,
-  from_city   TEXT NOT NULL,
-  to_city     TEXT NOT NULL,
-  min_price   INTEGER NOT NULL,
-  max_price   INTEGER NOT NULL,
-  bus_count   INTEGER NOT NULL,
-  description TEXT NOT NULL DEFAULT ''
-);
-
 CREATE TABLE buses (
   id              TEXT PRIMARY KEY,
   po_name         TEXT NOT NULL,
@@ -48,20 +38,11 @@ async function main() {
   db.run(SCHEMA_SQL);
 
   const { cities } = readSeed('cities.json');
-  const { routes } = readSeed('routes.json');
   const { buses } = readSeed('buses.json');
 
   const insertCity = db.prepare('INSERT INTO cities (id, name, province) VALUES (?, ?, ?)');
   cities.forEach((c) => insertCity.run([c.id, c.name, c.province]));
   insertCity.free();
-
-  const insertRoute = db.prepare(
-    'INSERT INTO routes (id, from_city, to_city, min_price, max_price, bus_count, description) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  );
-  routes.forEach((r) =>
-    insertRoute.run([r.id, r.from, r.to, r.minPrice, r.maxPrice, r.busCount, r.description])
-  );
-  insertRoute.free();
 
   const insertBus = db.prepare(
     `INSERT INTO buses
@@ -93,7 +74,6 @@ async function main() {
 
   console.log(`Wrote ${OUTPUT_FILE}`);
   console.log(`  cities: ${cities.length}`);
-  console.log(`  routes: ${routes.length}`);
   console.log(`  buses:  ${buses.length}`);
 }
 

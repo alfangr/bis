@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SearchForm } from '@/components/SearchForm';
 import { BusList } from '@/components/BusList';
-import { RouteCard } from '@/components/RouteCard';
-import { getCities, getRoutes, getBuses } from '@/lib/sqlite-db';
-import { City, Route as RouteType, Bus } from '@/types';
+import { getCities, getBuses } from '@/lib/sqlite-db';
+import { City, Bus } from '@/types';
 import { searchBuses } from '@/utils/searchBuses';
 import { formatDateLong } from '@/utils/formatters';
 import { BRAND_NAME } from '@/lib/constants';
@@ -20,7 +19,6 @@ import {
   X,
   ArrowRightLeft,
   Bus as BusIcon,
-  Route as RouteIcon,
   MapPin,
   Loader2,
 } from 'lucide-react';
@@ -37,7 +35,6 @@ type SearchResult = {
 
 export default function HomePage() {
   const [cities, setCities] = useState<City[]>([]);
-  const [routes, setRoutes] = useState<RouteType[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
   const [result, setResult] = useState<SearchResult>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,13 +46,8 @@ export default function HomePage() {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const [citiesRes, routesRes, busesRes] = await Promise.all([
-          getCities(),
-          getRoutes(),
-          getBuses(),
-        ]);
+        const [citiesRes, busesRes] = await Promise.all([getCities(), getBuses()]);
         setCities(citiesRes);
-        setRoutes(routesRes);
         setBuses(busesRes);
       } catch {
         setLoadError('Gagal memuat data. Silakan muat ulang halaman.');
@@ -143,11 +135,11 @@ export default function HomePage() {
                     <div className="flex items-center justify-between text-sm">
                       <div>
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Jadwal Tersedia
+                          Kota Tersedia
                         </p>
                         <p className="flex items-center gap-1 font-bold text-card-foreground">
-                          <RouteIcon className="h-4 w-4 text-primary" />
-                          {routes.length} Rute Aktif
+                          <MapPin className="h-4 w-4 text-primary" />
+                          {cities.length} Kota
                         </p>
                       </div>
                       <div className="text-right">
@@ -181,31 +173,10 @@ export default function HomePage() {
                 <h3 className="mb-2 font-heading text-xl font-bold text-card-foreground">
                   Mulai Cari Jadwal Bis
                 </h3>
-                <p className="mx-auto mb-8 max-w-md text-sm text-muted-foreground">
+                <p className="mx-auto max-w-md text-sm text-muted-foreground">
                   Pilih kota asal dan tujuan di form di atas untuk melihat daftar jadwal bis
                   yang tersedia.
                 </p>
-
-                <div id="rute" className="text-left">
-                  <h4 className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
-                    Atau pilih rute populer
-                  </h4>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {routes.map((route) => (
-                      <RouteCard
-                        key={route.id}
-                        route={route}
-                        onClickQuick={() =>
-                          handleSearch(
-                            route.from,
-                            route.to,
-                            new Date().toISOString().split('T')[0]
-                          )
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
               </CardContent>
             </Card>
           ) : (
@@ -255,32 +226,6 @@ export default function HomePage() {
           )}
         </div>
       </section>
-
-      {result && (
-        <section id="rute" className="bg-background py-10 sm:py-12">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mb-6">
-              <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5">
-                Rute Lainnya
-              </Badge>
-              <h2 className="mt-2 font-heading text-2xl font-bold text-card-foreground">
-                Coba Rute Populer
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {routes.map((route) => (
-                <RouteCard
-                  key={route.id}
-                  route={route}
-                  onClickQuick={(from, to) =>
-                    handleSearch(from, to, new Date().toISOString().split('T')[0])
-                  }
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       <section className="py-10 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

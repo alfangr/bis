@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   MapPin,
   Bus as BusIcon,
-  Route as RouteIcon,
   Plus,
   Pencil,
   Trash2,
@@ -30,19 +29,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Bus, City, Route } from '@/types';
+import type { Bus, City } from '@/types';
 import {
   getCities,
   saveCities,
   getBuses,
   saveBuses,
-  getRoutes,
-  saveRoutes,
   generateId,
   exportDatabase,
 } from '@/lib/sqlite-db';
 
-type AdminTab = 'cities' | 'buses' | 'routes';
+type AdminTab = 'cities' | 'buses';
 type ModalMode = 'create' | 'edit' | null;
 
 const formatNumber = (value: number): string => value.toLocaleString('id-ID');
@@ -197,108 +194,6 @@ const BusFormFields = ({
   </div>
 );
 
-const RouteFormFields = ({
-  value,
-  onChange,
-  cities,
-}: {
-  value: Omit<Route, 'id'>;
-  onChange: (v: Omit<Route, 'id'>) => void;
-  cities: City[];
-}) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label htmlFor="route-from">Kota Asal</Label>
-        <Select value={value.from} onValueChange={(v) => onChange({ ...value, from: v })}>
-          <SelectTrigger id="route-from">
-            <SelectValue placeholder="Pilih kota asal" />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((city) => (
-              <SelectItem key={`r-from-${city.id}`} value={city.name}>
-                {city.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="route-to">Kota Tujuan</Label>
-        <Select value={value.to} onValueChange={(v) => onChange({ ...value, to: v })}>
-          <SelectTrigger id="route-to">
-            <SelectValue placeholder="Pilih kota tujuan" />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((city) => (
-              <SelectItem key={`r-to-${city.id}`} value={city.name}>
-                {city.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="route-min" className="flex items-center gap-2">
-          <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
-          Harga Minimum (Rp)
-        </Label>
-        <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
-            Rp
-          </span>
-          <Input
-            id="route-min"
-            inputMode="numeric"
-            value={formatNumber(value.minPrice)}
-            onChange={(e) => onChange({ ...value, minPrice: parseNumber(e.target.value) })}
-            className="pl-10 tabular-nums"
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="route-max" className="flex items-center gap-2">
-          <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
-          Harga Maksimum (Rp)
-        </Label>
-        <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
-            Rp
-          </span>
-          <Input
-            id="route-max"
-            inputMode="numeric"
-            value={formatNumber(value.maxPrice)}
-            onChange={(e) => onChange({ ...value, maxPrice: parseNumber(e.target.value) })}
-            className="pl-10 tabular-nums"
-          />
-        </div>
-      </div>
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="route-count">Jumlah Bis di Rute Ini</Label>
-        <Input
-          id="route-count"
-          type="number"
-          min={0}
-          value={value.busCount}
-          onChange={(e) => onChange({ ...value, busCount: Number(e.target.value) || 0 })}
-        />
-      </div>
-    </div>
-    <div className="space-y-2">
-      <Label htmlFor="route-desc">Deskripsi Rute</Label>
-      <textarea
-        id="route-desc"
-        rows={3}
-        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        value={value.description}
-        onChange={(e) => onChange({ ...value, description: e.target.value })}
-        placeholder="Deskripsi singkat tentang rute ini"
-      />
-    </div>
-  </div>
-);
-
 const EMPTY_CITY: Omit<City, 'id'> = { name: '', province: '' };
 const EMPTY_BUS: BusFormValue = {
   poName: '',
@@ -309,34 +204,22 @@ const EMPTY_BUS: BusFormValue = {
   arrival: '',
   price: 0,
 };
-const EMPTY_ROUTE: Omit<Route, 'id'> = {
-  from: '',
-  to: '',
-  minPrice: 0,
-  maxPrice: 0,
-  busCount: 0,
-  description: '',
-};
-
 export default function AdminDashboard() {
   const [tab, setTab] = useState<AdminTab>('cities');
 
   const [cities, setCities] = useState<City[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
-  const [routes, setRoutes] = useState<Route[]>([]);
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editId, setEditId] = useState<string | null>(null);
 
   const [cityForm, setCityForm] = useState<Omit<City, 'id'>>(EMPTY_CITY);
   const [busForm, setBusForm] = useState<BusFormValue>(EMPTY_BUS);
-  const [routeForm, setRouteForm] = useState<Omit<Route, 'id'>>(EMPTY_ROUTE);
 
   const [loading, setLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState<Record<AdminTab, boolean>>({
     cities: false,
     buses: false,
-    routes: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -353,18 +236,12 @@ export default function AdminDashboard() {
     try {
       if (targetTab === 'cities') {
         setCities(await getCities());
-      } else if (targetTab === 'buses') {
-        if (!initialLoadDone.cities) {
-          setCities(await getCities());
-          setInitialLoadDone((s) => ({ ...s, cities: true }));
-        }
-        setBuses(await getBuses());
       } else {
         if (!initialLoadDone.cities) {
           setCities(await getCities());
           setInitialLoadDone((s) => ({ ...s, cities: true }));
         }
-        setRoutes(await getRoutes());
+        setBuses(await getBuses());
       }
       setInitialLoadDone((s) => ({ ...s, [targetTab]: true }));
     } catch (err) {
@@ -388,17 +265,16 @@ export default function AdminDashboard() {
     setError(null);
     setCityForm(EMPTY_CITY);
     setBusForm(EMPTY_BUS);
-    setRouteForm(EMPTY_ROUTE);
   };
 
-  const openEdit = (item: City | Bus | Route) => {
+  const openEdit = (item: City | Bus) => {
     setModalMode('edit');
     setError(null);
     if (tab === 'cities') {
       const c = item as City;
       setEditId(c.id);
       setCityForm({ name: c.name, province: c.province });
-    } else if (tab === 'buses') {
+    } else {
       const b = item as Bus;
       setEditId(b.id);
       setBusForm({
@@ -409,17 +285,6 @@ export default function AdminDashboard() {
         departure: b.departure,
         arrival: b.arrival,
         price: b.price,
-      });
-    } else {
-      const r = item as Route;
-      setEditId(r.id);
-      setRouteForm({
-        from: r.from,
-        to: r.to,
-        minPrice: r.minPrice,
-        maxPrice: r.maxPrice,
-        busCount: r.busCount,
-        description: r.description,
       });
     }
   };
@@ -459,7 +324,7 @@ export default function AdminDashboard() {
           setCities(next);
           setSuccess('Kota berhasil diperbarui');
         }
-      } else if (tab === 'buses') {
+      } else {
         if (
           !busForm.poName.trim() ||
           !busForm.busClass.trim() ||
@@ -508,42 +373,6 @@ export default function AdminDashboard() {
           setBuses(next);
           setSuccess('Bis berhasil diperbarui');
         }
-      } else if (tab === 'routes') {
-        if (!routeForm.from.trim() || !routeForm.to.trim() || !routeForm.description.trim()) {
-          throw new Error('Semua field wajib harus diisi dengan benar');
-        }
-        if (modalMode === 'create') {
-          const created: Route = {
-            id: generateId('ROUTE', routes),
-            from: routeForm.from.trim(),
-            to: routeForm.to.trim(),
-            minPrice: routeForm.minPrice,
-            maxPrice: routeForm.maxPrice,
-            busCount: routeForm.busCount,
-            description: routeForm.description.trim(),
-          };
-          const next = [...routes, created];
-          await saveRoutes(next);
-          setRoutes(next);
-          setSuccess('Rute berhasil ditambahkan');
-        } else if (modalMode === 'edit' && editId) {
-          const next = routes.map((r) =>
-            r.id === editId
-              ? {
-                  ...r,
-                  from: routeForm.from.trim(),
-                  to: routeForm.to.trim(),
-                  minPrice: routeForm.minPrice,
-                  maxPrice: routeForm.maxPrice,
-                  busCount: routeForm.busCount,
-                  description: routeForm.description.trim(),
-                }
-              : r
-          );
-          await saveRoutes(next);
-          setRoutes(next);
-          setSuccess('Rute berhasil diperbarui');
-        }
       }
       closeModal();
     } catch (err) {
@@ -564,14 +393,10 @@ export default function AdminDashboard() {
         const next = cities.filter((c) => c.id !== id);
         await saveCities(next);
         setCities(next);
-      } else if (tab === 'buses') {
+      } else {
         const next = buses.filter((b) => b.id !== id);
         await saveBuses(next);
         setBuses(next);
-      } else {
-        const next = routes.filter((r) => r.id !== id);
-        await saveRoutes(next);
-        setRoutes(next);
       }
       setSuccess('Data berhasil dihapus');
     } catch (err) {
@@ -608,17 +433,13 @@ export default function AdminDashboard() {
       ? modalMode === 'create'
         ? 'Tambah Kota Baru'
         : 'Edit Kota'
-      : tab === 'buses'
-        ? modalMode === 'create'
-          ? 'Tambah Bis Baru'
-          : 'Edit Bis'
-        : modalMode === 'create'
-          ? 'Tambah Rute Baru'
-          : 'Edit Rute';
+      : modalMode === 'create'
+        ? 'Tambah Bis Baru'
+        : 'Edit Bis';
 
-  const currentList = tab === 'cities' ? cities : tab === 'buses' ? buses : routes;
-  const totalAll = useMemo(() => cities.length + buses.length + routes.length, [cities, buses, routes]);
-  const statsReady = initialLoadDone.cities && initialLoadDone.buses && initialLoadDone.routes;
+  const currentList = tab === 'cities' ? cities : buses;
+  const totalAll = useMemo(() => cities.length + buses.length, [cities, buses]);
+  const statsReady = initialLoadDone.cities && initialLoadDone.buses;
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -634,7 +455,7 @@ export default function AdminDashboard() {
                   Dashboard Admin
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Kelola data kota, bis, dan rute
+                  Kelola data kota dan bis
                 </p>
               </div>
             </div>
@@ -642,12 +463,8 @@ export default function AdminDashboard() {
           <div className="flex flex-wrap gap-2 self-start sm:self-auto">
             <Button
               onClick={() => {
-                setInitialLoadDone({ cities: false, buses: false, routes: false });
-                void Promise.all([
-                  loadData('cities', true),
-                  loadData('buses', true),
-                  loadData('routes', true),
-                ]);
+                setInitialLoadDone({ cities: false, buses: false });
+                void Promise.all([loadData('cities', true), loadData('buses', true)]);
               }}
               variant="outline"
               className="gap-2"
@@ -663,7 +480,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-background border-primary/20">
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
@@ -690,21 +507,6 @@ export default function AdminDashboard() {
                 </p>
                 <p className="font-heading text-2xl font-bold text-card-foreground">
                   {statsReady ? buses.length : '—'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-secondary to-background border-secondary/30">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary-foreground/10">
-                <RouteIcon className="h-6 w-6 text-secondary-foreground" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Total Rute
-                </p>
-                <p className="font-heading text-2xl font-bold text-card-foreground">
-                  {statsReady ? routes.length : '—'}
                 </p>
               </div>
             </CardContent>
@@ -750,22 +552,10 @@ export default function AdminDashboard() {
                     {initialLoadDone.buses ? buses.length : '?'}
                   </Badge>
                 </Button>
-                <Button
-                  variant={tab === 'routes' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => switchTab('routes')}
-                  className="gap-2 h-8"
-                >
-                  <RouteIcon className="h-4 w-4" />
-                  Rute
-                  <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
-                    {initialLoadDone.routes ? routes.length : '?'}
-                  </Badge>
-                </Button>
               </div>
               <Button onClick={openCreate} className="gap-2 self-start sm:self-auto">
                 <Plus className="h-4 w-4" />
-                Tambah {tab === 'cities' ? 'Kota' : tab === 'buses' ? 'Bis' : 'Rute'}
+                Tambah {tab === 'cities' ? 'Kota' : 'Bis'}
               </Button>
             </div>
           </CardHeader>
@@ -781,10 +571,8 @@ export default function AdminDashboard() {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   {tab === 'cities' ? (
                     <MapPin className="h-8 w-8" />
-                  ) : tab === 'buses' ? (
-                    <BusIcon className="h-8 w-8" />
                   ) : (
-                    <RouteIcon className="h-8 w-8" />
+                    <BusIcon className="h-8 w-8" />
                   )}
                 </div>
                 <h3 className="font-semibold text-card-foreground mb-1">
@@ -879,53 +667,6 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 )}
-                {tab === 'routes' && (
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 text-left">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground w-28">ID</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground">Rute</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground">Harga Range</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground text-center">Jumlah Bis</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground">Deskripsi</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground text-right w-28">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {routes.map((route) => (
-                        <tr key={route.id} className="hover:bg-muted/30 align-top">
-                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{route.id}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <p className="font-medium text-card-foreground">
-                              {route.from}
-                              <span className="mx-1 text-muted-foreground">→</span>
-                              {route.to}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-card-foreground tabular-nums">
-                            Rp {route.minPrice.toLocaleString('id-ID')}
-                            <span className="mx-1 text-muted-foreground">-</span>
-                            Rp {route.maxPrice.toLocaleString('id-ID')}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <Badge variant="secondary">{route.busCount} bis</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground max-w-xs">{route.description}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="inline-flex gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEdit(route)} className="h-8 w-8 hover:text-primary" aria-label="Edit rute">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(route.id)} className="h-8 w-8 hover:text-destructive" aria-label="Hapus rute">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
               </div>
             )}
           </CardContent>
@@ -959,9 +700,6 @@ export default function AdminDashboard() {
               )}
               {tab === 'buses' && (
                 <BusFormFields value={busForm} onChange={setBusForm} cities={cities} />
-              )}
-              {tab === 'routes' && (
-                <RouteFormFields value={routeForm} onChange={setRouteForm} cities={cities} />
               )}
             </div>
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-border bg-muted/20 rounded-b-2xl">

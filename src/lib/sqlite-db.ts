@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js';
-import type { Bus, City, Route } from '@/types';
+import type { Bus, City } from '@/types';
 
 let dbPromise: Promise<Database> | null = null;
 
@@ -30,16 +30,6 @@ const rowToCity = (row: Record<string, unknown>): City => ({
   id: row.id as string,
   name: row.name as string,
   province: row.province as string,
-});
-
-const rowToRoute = (row: Record<string, unknown>): Route => ({
-  id: row.id as string,
-  from: row.from_city as string,
-  to: row.to_city as string,
-  minPrice: row.min_price as number,
-  maxPrice: row.max_price as number,
-  busCount: row.bus_count as number,
-  description: row.description as string,
 });
 
 const rowToBus = (row: Record<string, unknown>): Bus => ({
@@ -84,26 +74,6 @@ export const saveCities = async (cities: City[]): Promise<void> => {
     db.run('DELETE FROM cities');
     const stmt = db.prepare('INSERT INTO cities (id, name, province) VALUES (?, ?, ?)');
     cities.forEach((c) => stmt.run([c.id, c.name, c.province]));
-    stmt.free();
-  });
-};
-
-export const getRoutes = async (): Promise<Route[]> => {
-  const db = await getDb();
-  const rows = await selectAll(db, 'SELECT * FROM routes');
-  return rows.map(rowToRoute);
-};
-
-export const saveRoutes = async (routes: Route[]): Promise<void> => {
-  const db = await getDb();
-  runInTransaction(db, () => {
-    db.run('DELETE FROM routes');
-    const stmt = db.prepare(
-      'INSERT INTO routes (id, from_city, to_city, min_price, max_price, bus_count, description) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    );
-    routes.forEach((r) =>
-      stmt.run([r.id, r.from, r.to, r.minPrice, r.maxPrice, r.busCount, r.description])
-    );
     stmt.free();
   });
 };

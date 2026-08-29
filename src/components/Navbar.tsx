@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Menu, X, Bus, Search, Route, Settings } from 'lucide-react';
+import { Menu, X, Bus, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BRAND_NAME } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
@@ -33,12 +33,6 @@ export const Navbar = () => {
               <a href="#cari" className="gap-2">
                 <Search className="h-4 w-4" />
                 Cari Bis
-              </a>
-            </Button>
-            <Button variant="ghost" asChild>
-              <a href="#rute" className="gap-2">
-                <Route className="h-4 w-4" />
-                Rute Populer
               </a>
             </Button>
             <Button variant="outline" asChild>
@@ -74,17 +68,6 @@ export const Navbar = () => {
                 <a href="#cari" className="gap-2">
                   <Search className="h-4 w-4" />
                   Cari Bis
-                </a>
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setIsOpen(false)}
-                asChild
-              >
-                <a href="#rute" className="gap-2">
-                  <Route className="h-4 w-4" />
-                  Rute Populer
                 </a>
               </Button>
               <Button
