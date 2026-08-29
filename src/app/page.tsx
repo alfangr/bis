@@ -4,9 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SearchForm } from '@/components/SearchForm';
 import { BusList } from '@/components/BusList';
 import { RouteCard } from '@/components/RouteCard';
-import fallbackCities from '@/data/cities.json';
-import fallbackRoutes from '@/data/routes.json';
-import fallbackBuses from '@/data/buses.json';
+import { getCities, getRoutes, getBuses } from '@/lib/sqlite-db';
 import { City, Route as RouteType, Bus } from '@/types';
 import { searchBuses } from '@/utils/searchBuses';
 import { formatDateLong } from '@/utils/formatters';
@@ -15,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Search as SearchIcon,
   ArrowLeft,
@@ -23,14 +22,11 @@ import {
   Bus as BusIcon,
   Route as RouteIcon,
   MapPin,
+  Loader2,
 } from 'lucide-react';
 
 const HERO_IMAGE =
   'https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=modern+tourist+bus+on+the+road+in+east+java+indonesia+with+mountains+green+rice+fields%2C+sunny+day%2C+realistic+photography&image_size=landscape_16_9';
-
-const defaultCities = fallbackCities.cities as City[];
-const defaultRoutes = fallbackRoutes.routes as RouteType[];
-const defaultBuses = fallbackBuses.buses as Bus[];
 
 type SearchResult = {
   from: string;
@@ -40,28 +36,34 @@ type SearchResult = {
 } | null;
 
 export default function HomePage() {
-  const [cities, setCities] = useState<City[]>(defaultCities);
-  const [routes, setRoutes] = useState<RouteType[]>(defaultRoutes);
-  const [buses, setBuses] = useState<Bus[]>(defaultBuses);
+  const [cities, setCities] = useState<City[]>([]);
+  const [routes, setRoutes] = useState<RouteType[]>([]);
+  const [buses, setBuses] = useState<Bus[]>([]);
   const [result, setResult] = useState<SearchResult>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const loadLiveData = async () => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setLoadError(null);
       try {
         const [citiesRes, routesRes, busesRes] = await Promise.all([
-          fetch('/api/cities').then((r) => r.json()),
-          fetch('/api/routes').then((r) => r.json()),
-          fetch('/api/buses').then((r) => r.json()),
+          getCities(),
+          getRoutes(),
+          getBuses(),
         ]);
-        if (Array.isArray(citiesRes) && citiesRes.length > 0) setCities(citiesRes);
-        if (Array.isArray(routesRes) && routesRes.length > 0) setRoutes(routesRes);
-        if (Array.isArray(busesRes)) setBuses(busesRes);
+        setCities(citiesRes);
+        setRoutes(routesRes);
+        setBuses(busesRes);
       } catch {
-        // Fallback: pakai data default (import JSON)
+        setLoadError('Gagal memuat data. Silakan muat ulang halaman.');
+      } finally {
+        setIsLoading(false);
       }
     };
-    void loadLiveData();
+    void loadData();
   }, []);
 
   const handleSearch = useCallback(
@@ -77,6 +79,19 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col">
+      {loadError && (
+        <div className="mx-auto mt-4 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Alert variant="destructive">
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        </div>
+      )}
+      {isLoading && !loadError && (
+        <div className="mx-auto mt-4 flex w-full max-w-7xl items-center gap-2 px-4 text-sm text-muted-foreground sm:px-6 lg:px-8">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Memuat data...
+        </div>
+      )}
       <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-muted/30">
         <div className="pointer-events-none absolute inset-0 opacity-20">
           <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-primary/30 blur-3xl" />

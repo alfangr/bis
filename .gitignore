@@ -6,3 +6,5 @@ out
 .env.local
 .env
 .vercel
+public/sql-wasm.wasm
+public/sql-wasm-browser.wasm

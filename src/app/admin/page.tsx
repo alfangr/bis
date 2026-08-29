@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Clock,
   Banknote,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,26 +31,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Bus, City, Route } from '@/types';
+import {
+  getCities,
+  saveCities,
+  getBuses,
+  saveBuses,
+  getRoutes,
+  saveRoutes,
+  generateId,
+  exportDatabase,
+} from '@/lib/sqlite-db';
 
 type AdminTab = 'cities' | 'buses' | 'routes';
 type ModalMode = 'create' | 'edit' | null;
-
-type ApiError = { error: string };
-
-const API_BASE = '/api';
-
-const fetchJson = async <T,>(url: string, options?: RequestInit): Promise<T> => {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  const data = (await res.json()) as T;
-  if (!res.ok) {
-    const err = data as ApiError;
-    throw new Error(err.error ?? `Request failed with status ${res.status}`);
-  }
-  return data;
-};
 
 const formatNumber = (value: number): string => value.toLocaleString('id-ID');
 const parseNumber = (value: string): number => Number(value.replace(/[^0-9]/g, '')) || 0;
@@ -358,24 +352,19 @@ export default function AdminDashboard() {
     setError(null);
     try {
       if (targetTab === 'cities') {
-        const data = await fetchJson<City[]>(`${API_BASE}/cities`);
-        setCities(data);
+        setCities(await getCities());
       } else if (targetTab === 'buses') {
         if (!initialLoadDone.cities) {
-          const cityData = await fetchJson<City[]>(`${API_BASE}/cities`);
-          setCities(cityData);
+          setCities(await getCities());
           setInitialLoadDone((s) => ({ ...s, cities: true }));
         }
-        const data = await fetchJson<Bus[]>(`${API_BASE}/buses`);
-        setBuses(data);
+        setBuses(await getBuses());
       } else {
         if (!initialLoadDone.cities) {
-          const cityData = await fetchJson<City[]>(`${API_BASE}/cities`);
-          setCities(cityData);
+          setCities(await getCities());
           setInitialLoadDone((s) => ({ ...s, cities: true }));
         }
-        const data = await fetchJson<Route[]>(`${API_BASE}/routes`);
-        setRoutes(data);
+        setRoutes(await getRoutes());
       }
       setInitialLoadDone((s) => ({ ...s, [targetTab]: true }));
     } catch (err) {
@@ -447,51 +436,112 @@ export default function AdminDashboard() {
     setSuccess(null);
     try {
       if (tab === 'cities') {
+        if (!cityForm.name.trim() || !cityForm.province.trim()) {
+          throw new Error('Nama kota dan provinsi wajib diisi');
+        }
         if (modalMode === 'create') {
-          const created = await fetchJson<City>(`${API_BASE}/cities`, {
-            method: 'POST',
-            body: JSON.stringify(cityForm),
-          });
-          setCities((prev) => [...prev, created]);
+          const created: City = {
+            id: generateId('CITY', cities),
+            name: cityForm.name.trim(),
+            province: cityForm.province.trim(),
+          };
+          const next = [...cities, created];
+          await saveCities(next);
+          setCities(next);
           setSuccess('Kota berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const updated = await fetchJson<City>(`${API_BASE}/cities/${editId}`, {
-            method: 'PUT',
-            body: JSON.stringify(cityForm),
-          });
-          setCities((prev) => prev.map((c) => (c.id === editId ? updated : c)));
+          const next = cities.map((c) =>
+            c.id === editId
+              ? { ...c, name: cityForm.name.trim(), province: cityForm.province.trim() }
+              : c
+          );
+          await saveCities(next);
+          setCities(next);
           setSuccess('Kota berhasil diperbarui');
         }
       } else if (tab === 'buses') {
+        if (
+          !busForm.poName.trim() ||
+          !busForm.busClass.trim() ||
+          !busForm.from.trim() ||
+          !busForm.to.trim() ||
+          !busForm.departure.trim() ||
+          !busForm.arrival.trim()
+        ) {
+          throw new Error('Semua field wajib harus diisi dengan benar');
+        }
         if (modalMode === 'create') {
-          const created = await fetchJson<Bus>(`${API_BASE}/buses`, {
-            method: 'POST',
-            body: JSON.stringify(busForm),
-          });
-          setBuses((prev) => [...prev, created]);
+          const created: Bus = {
+            id: generateId('BIS', buses),
+            poName: busForm.poName.trim(),
+            poPhone: '',
+            class: busForm.busClass.trim(),
+            from: busForm.from.trim(),
+            to: busForm.to.trim(),
+            departure: busForm.departure.trim(),
+            arrival: busForm.arrival.trim(),
+            duration: '',
+            price: busForm.price,
+            seats: { available: 0, total: 0 },
+            amenities: [],
+          };
+          const next = [...buses, created];
+          await saveBuses(next);
+          setBuses(next);
           setSuccess('Bis berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const updated = await fetchJson<Bus>(`${API_BASE}/buses/${editId}`, {
-            method: 'PUT',
-            body: JSON.stringify(busForm),
-          });
-          setBuses((prev) => prev.map((b) => (b.id === editId ? updated : b)));
+          const next = buses.map((b) =>
+            b.id === editId
+              ? {
+                  ...b,
+                  poName: busForm.poName.trim(),
+                  class: busForm.busClass.trim(),
+                  from: busForm.from.trim(),
+                  to: busForm.to.trim(),
+                  departure: busForm.departure.trim(),
+                  arrival: busForm.arrival.trim(),
+                  price: busForm.price,
+                }
+              : b
+          );
+          await saveBuses(next);
+          setBuses(next);
           setSuccess('Bis berhasil diperbarui');
         }
       } else if (tab === 'routes') {
+        if (!routeForm.from.trim() || !routeForm.to.trim() || !routeForm.description.trim()) {
+          throw new Error('Semua field wajib harus diisi dengan benar');
+        }
         if (modalMode === 'create') {
-          const created = await fetchJson<Route>(`${API_BASE}/routes`, {
-            method: 'POST',
-            body: JSON.stringify(routeForm),
-          });
-          setRoutes((prev) => [...prev, created]);
+          const created: Route = {
+            id: generateId('ROUTE', routes),
+            from: routeForm.from.trim(),
+            to: routeForm.to.trim(),
+            minPrice: routeForm.minPrice,
+            maxPrice: routeForm.maxPrice,
+            busCount: routeForm.busCount,
+            description: routeForm.description.trim(),
+          };
+          const next = [...routes, created];
+          await saveRoutes(next);
+          setRoutes(next);
           setSuccess('Rute berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const updated = await fetchJson<Route>(`${API_BASE}/routes/${editId}`, {
-            method: 'PUT',
-            body: JSON.stringify(routeForm),
-          });
-          setRoutes((prev) => prev.map((r) => (r.id === editId ? updated : r)));
+          const next = routes.map((r) =>
+            r.id === editId
+              ? {
+                  ...r,
+                  from: routeForm.from.trim(),
+                  to: routeForm.to.trim(),
+                  minPrice: routeForm.minPrice,
+                  maxPrice: routeForm.maxPrice,
+                  busCount: routeForm.busCount,
+                  description: routeForm.description.trim(),
+                }
+              : r
+          );
+          await saveRoutes(next);
+          setRoutes(next);
           setSuccess('Rute berhasil diperbarui');
         }
       }
@@ -510,16 +560,18 @@ export default function AdminDashboard() {
     setError(null);
     setSuccess(null);
     try {
-      const endpoint = tab === 'cities' ? 'cities' : tab === 'buses' ? 'buses' : 'routes';
-      await fetchJson<{ message: string }>(`${API_BASE}/${endpoint}/${id}`, {
-        method: 'DELETE',
-      });
       if (tab === 'cities') {
-        setCities((prev) => prev.filter((c) => c.id !== id));
+        const next = cities.filter((c) => c.id !== id);
+        await saveCities(next);
+        setCities(next);
       } else if (tab === 'buses') {
-        setBuses((prev) => prev.filter((b) => b.id !== id));
+        const next = buses.filter((b) => b.id !== id);
+        await saveBuses(next);
+        setBuses(next);
       } else {
-        setRoutes((prev) => prev.filter((r) => r.id !== id));
+        const next = routes.filter((r) => r.id !== id);
+        await saveRoutes(next);
+        setRoutes(next);
       }
       setSuccess('Data berhasil dihapus');
     } catch (err) {
@@ -527,6 +579,27 @@ export default function AdminDashboard() {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportDatabase = async () => {
+    setError(null);
+    try {
+      const bytes = await exportDatabase();
+      const buffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      ) as ArrayBuffer;
+      const blob = new Blob([buffer], { type: 'application/x-sqlite3' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bis-inform.sqlite';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Gagal mengekspor database';
+      setError(message);
     }
   };
 
@@ -566,22 +639,28 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          <Button
-            onClick={() => {
-              setInitialLoadDone({ cities: false, buses: false, routes: false });
-              void Promise.all([
-                loadData('cities', true),
-                loadData('buses', true),
-                loadData('routes', true),
-              ]);
-            }}
-            variant="outline"
-            className="gap-2 self-start sm:self-auto"
-            disabled={loading}
-          >
-            <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
-          </Button>
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            <Button
+              onClick={() => {
+                setInitialLoadDone({ cities: false, buses: false, routes: false });
+                void Promise.all([
+                  loadData('cities', true),
+                  loadData('buses', true),
+                  loadData('routes', true),
+                ]);
+              }}
+              variant="outline"
+              className="gap-2"
+              disabled={loading}
+            >
+              <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+            <Button onClick={handleExportDatabase} variant="outline" className="gap-2">
+              <Download className="h-4 w-4" />
+              Export Database
+            </Button>
+          </div>
         </div>
 
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -853,7 +932,8 @@ export default function AdminDashboard() {
         </Card>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Total data tersimpan: {statsReady ? totalAll : '?'} item · Database via file JSON
+          Total data tersimpan: {statsReady ? totalAll : '?'} item · Database SQLite (sql.js) di
+          browser — klik &quot;Export Database&quot; untuk menyimpan perubahan secara permanen
         </p>
       </div>
 

@@ -1,0 +1,13 @@
+{
+  "routes": [
+    {
+      "id": "ROUTE006",
+      "from": "Surabaya",
+      "to": "Banyuwangi",
+      "minPrice": 195000,
+      "maxPrice": 195000,
+      "busCount": 1,
+      "description": "Rute malam menuju Pelabuhan Ketapang"
+    }
+  ]
+}
