@@ -7,7 +7,7 @@ import { FilterSidebar } from './FilterSidebar';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SORT_OPTIONS } from '@/lib/constants';
 import { filterBuses, sortBuses } from '@/utils/filterBuses';
-import { getPriceRange, getUniqueClasses } from '@/utils/searchBuses';
+import { getPriceRange } from '@/utils/searchBuses';
 import {
   Card,
   CardContent,
@@ -32,7 +32,6 @@ const DEFAULT_FILTERS: FilterState = {
   priceMax: null,
   timeFrom: null,
   timeTo: null,
-  classes: [],
 };
 
 export const BusList = ({ buses, isLoading = false }: BusListProps) => {
@@ -40,7 +39,6 @@ export const BusList = ({ buses, isLoading = false }: BusListProps) => {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
   const priceRange = useMemo(() => getPriceRange(buses), [buses]);
-  const availableClasses = useMemo(() => getUniqueClasses(buses), [buses]);
 
   const filteredBuses = useMemo(() => filterBuses(buses, filters), [buses, filters]);
   const sortedBuses = useMemo(() => sortBuses(filteredBuses, sortBy), [filteredBuses, sortBy]);
@@ -63,7 +61,6 @@ export const BusList = ({ buses, isLoading = false }: BusListProps) => {
         onChange={setFilters}
         minPrice={priceRange.min}
         maxPrice={priceRange.max}
-        availableClasses={availableClasses}
         resultCount={sortedBuses.length}
       />
 

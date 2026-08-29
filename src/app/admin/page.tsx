@@ -74,14 +74,19 @@ const CityFormFields = ({
   </div>
 );
 
+type BusStopFormValue = {
+  city: string;
+  price: number;
+};
+
 type BusFormValue = {
   poName: string;
-  busClass: string;
   from: string;
   to: string;
   departure: string;
   arrival: string;
   price: number;
+  stops: BusStopFormValue[];
 };
 
 const BusFormFields = ({
@@ -92,7 +97,23 @@ const BusFormFields = ({
   value: BusFormValue;
   onChange: (v: BusFormValue) => void;
   cities: City[];
-}) => (
+}) => {
+  const updateStop = (index: number, patch: Partial<BusStopFormValue>) => {
+    onChange({
+      ...value,
+      stops: value.stops.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    });
+  };
+
+  const addStop = () => {
+    onChange({ ...value, stops: [...value.stops, { city: '', price: 0 }] });
+  };
+
+  const removeStop = (index: number) => {
+    onChange({ ...value, stops: value.stops.filter((_, i) => i !== index) });
+  };
+
+  return (
   <div className="space-y-4">
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="space-y-2 sm:col-span-2">
@@ -103,19 +124,6 @@ const BusFormFields = ({
           onChange={(e) => onChange({ ...value, poName: e.target.value })}
           placeholder="Contoh: Bis Jaya Indah"
         />
-      </div>
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="bus-class">Kelas Bis</Label>
-        <Select value={value.busClass} onValueChange={(v) => onChange({ ...value, busClass: v })}>
-          <SelectTrigger id="bus-class">
-            <SelectValue placeholder="Pilih kelas bis" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Standar">Standar</SelectItem>
-            <SelectItem value="Executive">Executive</SelectItem>
-            <SelectItem value="VIP">VIP</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="bus-from">Kota Asal</Label>
@@ -191,19 +199,80 @@ const BusFormFields = ({
         </div>
       </div>
     </div>
+
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Titik Berhenti (opsional)</Label>
+        <Button type="button" variant="outline" size="sm" onClick={addStop} className="gap-1 h-7 px-2 text-xs">
+          <Plus className="h-3.5 w-3.5" />
+          Tambah Titik Berhenti
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Rute resmi tetap {value.from || '...'} - {value.to || '...'}. Titik berhenti dipakai kalau
+        penumpang turun di kota tengah rute dengan harga yang berbeda dari harga tiket penuh.
+      </p>
+      {value.stops.length > 0 && (
+        <div className="space-y-2 pt-1">
+          {value.stops.map((stop, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Select
+                value={stop.city}
+                onValueChange={(v) => updateStop(index, { city: v })}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Pilih kota berhenti" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cities.map((city) => (
+                    <SelectItem key={`stop-${index}-${city.id}`} value={city.name}>
+                      {city.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative w-36">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
+                  Rp
+                </span>
+                <Input
+                  inputMode="numeric"
+                  value={formatNumber(stop.price)}
+                  onChange={(e) => updateStop(index, { price: parseNumber(e.target.value) })}
+                  className="pl-10 tabular-nums"
+                  placeholder="10.000"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeStop(index)}
+                className="h-9 w-9 shrink-0 hover:text-destructive"
+                aria-label="Hapus titik berhenti"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   </div>
-);
+  );
+};
 
 const EMPTY_CITY: Omit<City, 'id'> = { name: '', province: '' };
 const EMPTY_BUS: BusFormValue = {
   poName: '',
-  busClass: '',
   from: '',
   to: '',
   departure: '',
   arrival: '',
   price: 0,
+  stops: [],
 };
+
 export default function AdminDashboard() {
   const [tab, setTab] = useState<AdminTab>('cities');
 
@@ -279,12 +348,12 @@ export default function AdminDashboard() {
       setEditId(b.id);
       setBusForm({
         poName: b.poName,
-        busClass: b.class,
         from: b.from,
         to: b.to,
         departure: b.departure,
         arrival: b.arrival,
         price: b.price,
+        stops: b.stops ? b.stops.map((s) => ({ city: s.city, price: s.price })) : [],
       });
     }
   };
@@ -327,7 +396,6 @@ export default function AdminDashboard() {
       } else {
         if (
           !busForm.poName.trim() ||
-          !busForm.busClass.trim() ||
           !busForm.from.trim() ||
           !busForm.to.trim() ||
           !busForm.departure.trim() ||
@@ -335,12 +403,14 @@ export default function AdminDashboard() {
         ) {
           throw new Error('Semua field wajib harus diisi dengan benar');
         }
+        const stops = busForm.stops
+          .filter((s) => s.city.trim())
+          .map((s) => ({ city: s.city.trim(), price: s.price }));
         if (modalMode === 'create') {
           const created: Bus = {
             id: generateId('BIS', buses),
             poName: busForm.poName.trim(),
             poPhone: '',
-            class: busForm.busClass.trim(),
             from: busForm.from.trim(),
             to: busForm.to.trim(),
             departure: busForm.departure.trim(),
@@ -349,6 +419,7 @@ export default function AdminDashboard() {
             price: busForm.price,
             seats: { available: 0, total: 0 },
             amenities: [],
+            stops: stops.length > 0 ? stops : undefined,
           };
           const next = [...buses, created];
           await saveBuses(next);
@@ -360,12 +431,12 @@ export default function AdminDashboard() {
               ? {
                   ...b,
                   poName: busForm.poName.trim(),
-                  class: busForm.busClass.trim(),
                   from: busForm.from.trim(),
                   to: busForm.to.trim(),
                   departure: busForm.departure.trim(),
                   arrival: busForm.arrival.trim(),
                   price: busForm.price,
+                  stops: stops.length > 0 ? stops : undefined,
                 }
               : b
           );
@@ -626,7 +697,7 @@ export default function AdminDashboard() {
                         <th className="px-4 py-3 font-semibold text-muted-foreground">PO Bis</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Rute</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Jam</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground">Kelas</th>
+                        <th className="px-4 py-3 font-semibold text-muted-foreground">Titik Berhenti</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground text-right">Harga</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground text-right w-28">Aksi</th>
                       </tr>
@@ -647,7 +718,17 @@ export default function AdminDashboard() {
                             <p className="text-card-foreground">{bus.departure} - {bus.arrival}</p>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant="outline" className="font-normal">{bus.class}</Badge>
+                            {bus.stops && bus.stops.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {bus.stops.map((s) => (
+                                  <Badge key={s.city} variant="outline" className="font-normal">
+                                    {s.city} · Rp{s.price.toLocaleString('id-ID')}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right font-semibold text-card-foreground whitespace-nowrap tabular-nums">
                             Rp {bus.price.toLocaleString('id-ID')}

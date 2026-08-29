@@ -15,17 +15,12 @@ import {
   MessageCircle,
   AlertTriangle,
   CheckCircle2,
+  MapPinned,
 } from 'lucide-react';
 
 interface BusCardProps {
   bus: Bus;
 }
-
-const CLASS_VARIANTS: Record<string, 'default' | 'secondary' | 'outline'> = {
-  Executive: 'default',
-  VIP: 'secondary',
-  Standar: 'outline',
-};
 
 export const BusCard = ({ bus }: BusCardProps) => {
   const availablePct = Math.round((bus.seats.available / bus.seats.total) * 100);
@@ -37,11 +32,6 @@ export const BusCard = ({ bus }: BusCardProps) => {
     ? `https://wa.me/62${bus.poPhone.slice(1)}?text=${whatsappMsg}`
     : `https://wa.me/${bus.poPhone}?text=${whatsappMsg}`;
 
-  const classVariant = (CLASS_VARIANTS[bus.class] || 'outline') as
-    | 'default'
-    | 'secondary'
-    | 'outline';
-
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <CardHeader className="flex flex-wrap flex-row items-start justify-between gap-3 pb-4">
@@ -50,7 +40,6 @@ export const BusCard = ({ bus }: BusCardProps) => {
             <h3 className="font-heading text-lg font-bold text-card-foreground">
               {bus.poName}
             </h3>
-            <Badge variant={classVariant}>{bus.class}</Badge>
           </div>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Phone className="h-3 w-3" />
@@ -80,17 +69,19 @@ export const BusCard = ({ bus }: BusCardProps) => {
             </p>
           </div>
 
-          <div className="relative flex flex-col items-center">
-            <Separator className="w-full" />
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3">
-              <ArrowRight className="h-5 w-5 text-primary" />
+          <div className="flex flex-col items-center">
+            <div className="relative flex w-full items-center">
+              <Separator className="w-full" />
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3">
+                <ArrowRight className="h-5 w-5 text-primary" />
+              </div>
             </div>
             <p className="mt-3 text-[11px] font-medium text-muted-foreground">
               {bus.duration}
             </p>
-            {bus.stops && bus.stops.length > 0 && (
-              <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-                Transit: {bus.stops.join(', ')}
+            {!bus.officialTo && bus.stops && bus.stops.length > 0 && (
+              <p className="mt-0.5 text-center text-[10px] text-muted-foreground/70">
+                Transit: {bus.stops.map((s) => s.city).join(', ')}
               </p>
             )}
           </div>
@@ -102,6 +93,14 @@ export const BusCard = ({ bus }: BusCardProps) => {
             </p>
           </div>
         </div>
+
+        {bus.officialTo && (
+          <div className="mb-4 flex items-center gap-1.5 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            <MapPinned className="h-3.5 w-3.5 shrink-0 text-primary" />
+            Titik berhenti di rute resmi {bus.from} → {bus.officialTo}. Bis akan lanjut ke{' '}
+            {bus.officialTo} setelah {bus.to}.
+          </div>
+        )}
 
         <Separator className="mb-4" />
 

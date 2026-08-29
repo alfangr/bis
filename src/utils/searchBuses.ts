@@ -1,5 +1,13 @@
 import type { Bus, SearchParams } from '@/types';
 
+/**
+ * Matches a bus either by its official `to` (full-route fare) or by one of
+ * its intermediate `stops` (e.g. a bus whose official route is Malang -
+ * Surabaya but also stops at Pasuruan for a cheaper fare). A stop match is
+ * returned as a derived bus record with `to`/`price` overridden to the stop's
+ * values and `officialTo` set to the bus's real terminus, so the UI can show
+ * that the bus continues past this stop.
+ */
 export const searchBuses = (buses: Bus[], params: SearchParams): Bus[] => {
   const { from, to } = params;
 
@@ -7,11 +15,25 @@ export const searchBuses = (buses: Bus[], params: SearchParams): Bus[] => {
     return [];
   }
 
-  return buses.filter(
-    (bus) =>
-      bus.from.toLowerCase() === from.toLowerCase() &&
-      bus.to.toLowerCase() === to.toLowerCase()
-  );
+  const fromLower = from.toLowerCase();
+  const toLower = to.toLowerCase();
+  const results: Bus[] = [];
+
+  for (const bus of buses) {
+    if (bus.from.toLowerCase() !== fromLower) continue;
+
+    if (bus.to.toLowerCase() === toLower) {
+      results.push(bus);
+      continue;
+    }
+
+    const stop = bus.stops?.find((s) => s.city.toLowerCase() === toLower);
+    if (stop) {
+      results.push({ ...bus, to: stop.city, price: stop.price, officialTo: bus.to });
+    }
+  }
+
+  return results;
 };
 
 export const getPriceRange = (buses: Bus[]): { min: number; max: number } => {
@@ -21,9 +43,4 @@ export const getPriceRange = (buses: Bus[]): { min: number; max: number } => {
     min: Math.min(...prices),
     max: Math.max(...prices),
   };
-};
-
-export const getUniqueClasses = (buses: Bus[]): string[] => {
-  const classes = new Set(buses.map((b) => b.class));
-  return Array.from(classes).sort();
 };

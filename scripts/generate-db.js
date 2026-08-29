@@ -16,7 +16,6 @@ CREATE TABLE buses (
   id              TEXT PRIMARY KEY,
   po_name         TEXT NOT NULL,
   po_phone        TEXT NOT NULL DEFAULT '',
-  class           TEXT NOT NULL,
   from_city       TEXT NOT NULL,
   to_city         TEXT NOT NULL,
   departure       TEXT NOT NULL,
@@ -46,15 +45,14 @@ async function main() {
 
   const insertBus = db.prepare(
     `INSERT INTO buses
-      (id, po_name, po_phone, class, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, amenities, stops)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (id, po_name, po_phone, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, amenities, stops)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   buses.forEach((b) =>
     insertBus.run([
       b.id,
       b.poName,
       b.poPhone ?? '',
-      b.class,
       b.from,
       b.to,
       b.departure,

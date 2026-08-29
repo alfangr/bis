@@ -3,11 +3,15 @@ export interface BusSeats {
   total: number;
 }
 
+export interface BusStop {
+  city: string;
+  price: number;
+}
+
 export interface Bus {
   id: string;
   poName: string;
   poPhone: string;
-  class: string;
   from: string;
   to: string;
   departure: string;
@@ -16,7 +20,13 @@ export interface Bus {
   price: number;
   seats: BusSeats;
   amenities: string[];
-  stops?: string[];
+  stops?: BusStop[];
+  /**
+   * Set only on a search-result bus that matched via an intermediate stop
+   * instead of its official `to` — holds that official terminus so the UI
+   * can show "turun di tengah rute" context. Never persisted.
+   */
+  officialTo?: string;
 }
 
 export interface City {
@@ -38,5 +48,4 @@ export interface FilterState {
   priceMax: number | null;
   timeFrom: string | null;
   timeTo: string | null;
-  classes: string[];
 }

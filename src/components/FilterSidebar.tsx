@@ -6,7 +6,6 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Filter, RotateCcw } from 'lucide-react';
 
@@ -15,7 +14,6 @@ interface FilterSidebarProps {
   onChange: (filters: FilterState) => void;
   minPrice: number;
   maxPrice: number;
-  availableClasses: string[];
   resultCount: number;
 }
 
@@ -24,7 +22,6 @@ export const FilterSidebar = ({
   onChange,
   minPrice,
   maxPrice,
-  availableClasses,
   resultCount,
 }: FilterSidebarProps) => {
   const update = (patch: Partial<FilterState>) => {
@@ -37,15 +34,7 @@ export const FilterSidebar = ({
       priceMax: null,
       timeFrom: null,
       timeTo: null,
-      classes: [],
     });
-  };
-
-  const handleClassToggle = (cls: string) => {
-    const next = filters.classes.includes(cls)
-      ? filters.classes.filter((c) => c !== cls)
-      : [...filters.classes, cls];
-    update({ classes: next });
   };
 
   return (
@@ -136,27 +125,6 @@ export const FilterSidebar = ({
                 onChange={(e) => update({ timeTo: e.target.value || null })}
               />
             </div>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <Label className="text-xs font-semibold uppercase tracking-wide">
-            Kelas Bis
-          </Label>
-          <div className="flex flex-wrap gap-2">
-            {availableClasses.map((cls) => {
-              const active = filters.classes.includes(cls);
-              return (
-                <Badge
-                  key={cls}
-                  variant={active ? 'default' : 'outline'}
-                  className="cursor-pointer transition-colors"
-                  onClick={() => handleClassToggle(cls)}
-                >
-                  {cls}
-                </Badge>
-              );
-            })}
           </div>
         </section>
       </CardContent>

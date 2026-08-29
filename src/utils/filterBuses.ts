@@ -46,8 +46,6 @@ export const filterBuses = (buses: Bus[], filters: FilterState): Bus[] => {
       if (depMinutes > maxMinutes) return false;
     }
 
-    if (filters.classes.length > 0 && !filters.classes.includes(bus.class)) return false;
-
     return true;
   });
 };

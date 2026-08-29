@@ -36,7 +36,6 @@ const rowToBus = (row: Record<string, unknown>): Bus => ({
   id: row.id as string,
   poName: row.po_name as string,
   poPhone: row.po_phone as string,
-  class: row.class as string,
   from: row.from_city as string,
   to: row.to_city as string,
   departure: row.departure as string,
@@ -90,15 +89,14 @@ export const saveBuses = async (buses: Bus[]): Promise<void> => {
     db.run('DELETE FROM buses');
     const stmt = db.prepare(
       `INSERT INTO buses
-        (id, po_name, po_phone, class, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, amenities, stops)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (id, po_name, po_phone, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, amenities, stops)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     buses.forEach((b) =>
       stmt.run([
         b.id,
         b.poName,
         b.poPhone,
-        b.class,
         b.from,
         b.to,
         b.departure,
