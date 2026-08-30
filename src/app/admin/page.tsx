@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Clock,
   Banknote,
-  Download,
   Phone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,43 +30,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Bus, BusOperator, City, Schedule } from '@/types';
-import {
-  getCities,
-  saveCities,
-  getBusOperators,
-  saveBusOperators,
-  getSchedules,
-  saveSchedules,
-  generateId,
-  exportDatabase,
-} from '@/lib/sqlite-db';
+import type { Bus, BusOperator, City } from '@/types';
 
 type AdminTab = 'cities' | 'buses' | 'schedules';
 type ModalMode = 'create' | 'edit' | null;
 
+const API_BASE = '/api';
+
+type ApiError = { error: string };
+
+const fetchJson = async <T,>(url: string, options?: RequestInit): Promise<T> => {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const data = (await res.json()) as T;
+  if (!res.ok) {
+    const err = data as unknown as ApiError;
+    throw new Error(err.error ?? `Request failed with status ${res.status}`);
+  }
+  return data;
+};
+
 const formatNumber = (value: number): string => value.toLocaleString('id-ID');
 const parseNumber = (value: string): number => Number(value.replace(/[^0-9]/g, '')) || 0;
-
-const toSchedule = (b: Bus): Schedule => ({
-  id: b.id,
-  busId: b.busId,
-  from: b.from,
-  to: b.to,
-  departure: b.departure,
-  arrival: b.arrival,
-  duration: b.duration,
-  price: b.price,
-  seats: b.seats,
-  stops: b.stops,
-});
-
-const hydrateSchedule = (schedule: Schedule, operator: BusOperator | undefined): Bus => ({
-  ...schedule,
-  poName: operator?.poName ?? '',
-  poPhone: operator?.poPhone ?? '',
-  amenities: operator?.amenities ?? [],
-});
 
 const CityFormFields = ({
   value,
@@ -374,19 +360,19 @@ export default function AdminDashboard() {
     setError(null);
     try {
       if (targetTab === 'cities') {
-        setCities(await getCities());
+        setCities(await fetchJson<City[]>(`${API_BASE}/cities`));
       } else if (targetTab === 'buses') {
-        setBusOperators(await getBusOperators());
+        setBusOperators(await fetchJson<BusOperator[]>(`${API_BASE}/buses`));
       } else {
         if (!initialLoadDone.cities) {
-          setCities(await getCities());
+          setCities(await fetchJson<City[]>(`${API_BASE}/cities`));
           setInitialLoadDone((s) => ({ ...s, cities: true }));
         }
         if (!initialLoadDone.buses) {
-          setBusOperators(await getBusOperators());
+          setBusOperators(await fetchJson<BusOperator[]>(`${API_BASE}/buses`));
           setInitialLoadDone((s) => ({ ...s, buses: true }));
         }
-        setSchedules(await getSchedules());
+        setSchedules(await fetchJson<Bus[]>(`${API_BASE}/schedules`));
       }
       setInitialLoadDone((s) => ({ ...s, [targetTab]: true }));
     } catch (err) {
@@ -455,23 +441,18 @@ export default function AdminDashboard() {
           throw new Error('Nama kota dan provinsi wajib diisi');
         }
         if (modalMode === 'create') {
-          const created: City = {
-            id: generateId('CITY', cities),
-            name: cityForm.name.trim(),
-            province: cityForm.province.trim(),
-          };
-          const next = [...cities, created];
-          await saveCities(next);
-          setCities(next);
+          const created = await fetchJson<City>(`${API_BASE}/cities`, {
+            method: 'POST',
+            body: JSON.stringify(cityForm),
+          });
+          setCities((prev) => [...prev, created]);
           setSuccess('Kota berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const next = cities.map((c) =>
-            c.id === editId
-              ? { ...c, name: cityForm.name.trim(), province: cityForm.province.trim() }
-              : c
-          );
-          await saveCities(next);
-          setCities(next);
+          const updated = await fetchJson<City>(`${API_BASE}/cities/${editId}`, {
+            method: 'PUT',
+            body: JSON.stringify(cityForm),
+          });
+          setCities((prev) => prev.map((c) => (c.id === editId ? updated : c)));
           setSuccess('Kota berhasil diperbarui');
         }
       } else if (tab === 'buses') {
@@ -479,28 +460,18 @@ export default function AdminDashboard() {
           throw new Error('Nama PO Bis wajib diisi');
         }
         if (modalMode === 'create') {
-          const created: BusOperator = {
-            id: generateId('BIS', busOperators),
-            poName: busOperatorForm.poName.trim(),
-            poPhone: busOperatorForm.poPhone.trim(),
-            amenities: [],
-          };
-          const next = [...busOperators, created];
-          await saveBusOperators(next);
-          setBusOperators(next);
+          const created = await fetchJson<BusOperator>(`${API_BASE}/buses`, {
+            method: 'POST',
+            body: JSON.stringify(busOperatorForm),
+          });
+          setBusOperators((prev) => [...prev, created]);
           setSuccess('Bis berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const next = busOperators.map((b) =>
-            b.id === editId
-              ? {
-                  ...b,
-                  poName: busOperatorForm.poName.trim(),
-                  poPhone: busOperatorForm.poPhone.trim(),
-                }
-              : b
-          );
-          await saveBusOperators(next);
-          setBusOperators(next);
+          const updated = await fetchJson<BusOperator>(`${API_BASE}/buses/${editId}`, {
+            method: 'PUT',
+            body: JSON.stringify(busOperatorForm),
+          });
+          setBusOperators((prev) => prev.map((b) => (b.id === editId ? updated : b)));
           setSuccess('Bis berhasil diperbarui');
         }
       } else {
@@ -516,46 +487,20 @@ export default function AdminDashboard() {
         const stops = scheduleForm.stops
           .filter((s) => s.city.trim())
           .map((s) => ({ city: s.city.trim(), price: s.price }));
-        const operator = busOperators.find((b) => b.id === scheduleForm.busId);
+        const payload = { ...scheduleForm, stops };
         if (modalMode === 'create') {
-          const created: Schedule = {
-            id: generateId('JDW', schedules),
-            busId: scheduleForm.busId,
-            from: scheduleForm.from.trim(),
-            to: scheduleForm.to.trim(),
-            departure: scheduleForm.departure.trim(),
-            arrival: scheduleForm.arrival.trim(),
-            duration: '',
-            price: scheduleForm.price,
-            seats: { available: 0, total: 0 },
-            stops: stops.length > 0 ? stops : undefined,
-          };
-          const next = [...schedules, hydrateSchedule(created, operator)];
-          await saveSchedules(next.map(toSchedule));
-          setSchedules(next);
+          const created = await fetchJson<Bus>(`${API_BASE}/schedules`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          setSchedules((prev) => [...prev, created]);
           setSuccess('Jadwal berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const next = schedules.map((s) =>
-            s.id === editId
-              ? hydrateSchedule(
-                  {
-                    id: s.id,
-                    busId: scheduleForm.busId,
-                    from: scheduleForm.from.trim(),
-                    to: scheduleForm.to.trim(),
-                    departure: scheduleForm.departure.trim(),
-                    arrival: scheduleForm.arrival.trim(),
-                    duration: s.duration,
-                    price: scheduleForm.price,
-                    seats: s.seats,
-                    stops: stops.length > 0 ? stops : undefined,
-                  },
-                  operator
-                )
-              : s
-          );
-          await saveSchedules(next.map(toSchedule));
-          setSchedules(next);
+          const updated = await fetchJson<Bus>(`${API_BASE}/schedules/${editId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+          setSchedules((prev) => prev.map((s) => (s.id === editId ? updated : s)));
           setSuccess('Jadwal berhasil diperbarui');
         }
       }
@@ -574,24 +519,19 @@ export default function AdminDashboard() {
     setError(null);
     setSuccess(null);
     try {
+      const endpoint = tab === 'cities' ? 'cities' : tab === 'buses' ? 'buses' : 'schedules';
+      await fetchJson<{ message: string }>(`${API_BASE}/${endpoint}/${id}`, {
+        method: 'DELETE',
+      });
       if (tab === 'cities') {
-        const next = cities.filter((c) => c.id !== id);
-        await saveCities(next);
-        setCities(next);
+        setCities((prev) => prev.filter((c) => c.id !== id));
       } else if (tab === 'buses') {
-        const nextOperators = busOperators.filter((b) => b.id !== id);
-        await saveBusOperators(nextOperators);
-        setBusOperators(nextOperators);
-        // A schedule without its bus operator has nothing to display — drop them together.
-        const nextSchedules = schedules.filter((s) => s.busId !== id);
-        if (nextSchedules.length !== schedules.length) {
-          await saveSchedules(nextSchedules.map(toSchedule));
-          setSchedules(nextSchedules);
-        }
+        setBusOperators((prev) => prev.filter((b) => b.id !== id));
+        // Deleting a bus operator cascades to its schedules on the server —
+        // drop them from local state too so the Jadwal tab stays in sync.
+        setSchedules((prev) => prev.filter((s) => s.busId !== id));
       } else {
-        const next = schedules.filter((s) => s.id !== id);
-        await saveSchedules(next.map(toSchedule));
-        setSchedules(next);
+        setSchedules((prev) => prev.filter((s) => s.id !== id));
       }
       setSuccess('Data berhasil dihapus');
     } catch (err) {
@@ -599,27 +539,6 @@ export default function AdminDashboard() {
       setError(message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleExportDatabase = async () => {
-    setError(null);
-    try {
-      const bytes = await exportDatabase();
-      const buffer = bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength
-      ) as ArrayBuffer;
-      const blob = new Blob([buffer], { type: 'application/x-sqlite3' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'bis-inform.sqlite';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Gagal mengekspor database';
-      setError(message);
     }
   };
 
@@ -678,10 +597,6 @@ export default function AdminDashboard() {
             >
               <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh Data
-            </Button>
-            <Button onClick={handleExportDatabase} variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Export Database
             </Button>
           </div>
         </div>
@@ -949,8 +864,8 @@ export default function AdminDashboard() {
         </Card>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Total data tersimpan: {statsReady ? totalAll : '?'} item · Database SQLite (sql.js) di
-          browser — klik &quot;Export Database&quot; untuk menyimpan perubahan secara permanen
+          Total data tersimpan: {statsReady ? totalAll : '?'} item · Database Turso — perubahan
+          langsung tersimpan permanen
         </p>
       </div>
 
