@@ -1,0 +1,21 @@
+{
+  "schedules": [
+    {
+      "id": "JDW001",
+      "busId": "BIS013",
+      "from": "Malang",
+      "to": "Surabaya",
+      "departure": "05:03",
+      "arrival": "07:30",
+      "duration": "",
+      "price": 20000,
+      "seats": {
+        "available": 0,
+        "total": 0
+      },
+      "stops": [
+        { "city": "Pasuruan", "price": 10000 }
+      ]
+    }
+  ]
+}

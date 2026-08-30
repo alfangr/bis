@@ -13,9 +13,15 @@ CREATE TABLE cities (
 );
 
 CREATE TABLE buses (
+  id        TEXT PRIMARY KEY,
+  po_name   TEXT NOT NULL,
+  po_phone  TEXT NOT NULL DEFAULT '',
+  amenities TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE schedules (
   id              TEXT PRIMARY KEY,
-  po_name         TEXT NOT NULL,
-  po_phone        TEXT NOT NULL DEFAULT '',
+  bus_id          TEXT NOT NULL REFERENCES buses(id),
   from_city       TEXT NOT NULL,
   to_city         TEXT NOT NULL,
   departure       TEXT NOT NULL,
@@ -24,7 +30,6 @@ CREATE TABLE buses (
   price           INTEGER NOT NULL,
   seats_available INTEGER NOT NULL,
   seats_total     INTEGER NOT NULL,
-  amenities       TEXT NOT NULL DEFAULT '[]',
   stops           TEXT
 );
 `;
@@ -38,41 +43,49 @@ async function main() {
 
   const { cities } = readSeed('cities.json');
   const { buses } = readSeed('buses.json');
+  const { schedules } = readSeed('schedules.json');
 
   const insertCity = db.prepare('INSERT INTO cities (id, name, province) VALUES (?, ?, ?)');
   cities.forEach((c) => insertCity.run([c.id, c.name, c.province]));
   insertCity.free();
 
   const insertBus = db.prepare(
-    `INSERT INTO buses
-      (id, po_name, po_phone, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, amenities, stops)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    'INSERT INTO buses (id, po_name, po_phone, amenities) VALUES (?, ?, ?, ?)'
   );
   buses.forEach((b) =>
-    insertBus.run([
-      b.id,
-      b.poName,
-      b.poPhone ?? '',
-      b.from,
-      b.to,
-      b.departure,
-      b.arrival,
-      b.duration ?? null,
-      b.price,
-      b.seats.available,
-      b.seats.total,
-      JSON.stringify(b.amenities ?? []),
-      b.stops ? JSON.stringify(b.stops) : null,
-    ])
+    insertBus.run([b.id, b.poName, b.poPhone ?? '', JSON.stringify(b.amenities ?? [])])
   );
   insertBus.free();
+
+  const insertSchedule = db.prepare(
+    `INSERT INTO schedules
+      (id, bus_id, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, stops)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  schedules.forEach((s) =>
+    insertSchedule.run([
+      s.id,
+      s.busId,
+      s.from,
+      s.to,
+      s.departure,
+      s.arrival,
+      s.duration ?? null,
+      s.price,
+      s.seats.available,
+      s.seats.total,
+      s.stops ? JSON.stringify(s.stops) : null,
+    ])
+  );
+  insertSchedule.free();
 
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
   fs.writeFileSync(OUTPUT_FILE, Buffer.from(db.export()));
 
   console.log(`Wrote ${OUTPUT_FILE}`);
-  console.log(`  cities: ${cities.length}`);
-  console.log(`  buses:  ${buses.length}`);
+  console.log(`  cities:    ${cities.length}`);
+  console.log(`  buses:     ${buses.length}`);
+  console.log(`  schedules: ${schedules.length}`);
 }
 
 main().catch((err) => {

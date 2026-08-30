@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   MapPin,
   Bus as BusIcon,
+  CalendarClock,
   Plus,
   Pencil,
   Trash2,
@@ -14,6 +15,7 @@ import {
   Clock,
   Banknote,
   Download,
+  Phone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,21 +31,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Bus, City } from '@/types';
+import type { Bus, BusOperator, City, Schedule } from '@/types';
 import {
   getCities,
   saveCities,
-  getBuses,
-  saveBuses,
+  getBusOperators,
+  saveBusOperators,
+  getSchedules,
+  saveSchedules,
   generateId,
   exportDatabase,
 } from '@/lib/sqlite-db';
 
-type AdminTab = 'cities' | 'buses';
+type AdminTab = 'cities' | 'buses' | 'schedules';
 type ModalMode = 'create' | 'edit' | null;
 
 const formatNumber = (value: number): string => value.toLocaleString('id-ID');
 const parseNumber = (value: string): number => Number(value.replace(/[^0-9]/g, '')) || 0;
+
+const toSchedule = (b: Bus): Schedule => ({
+  id: b.id,
+  busId: b.busId,
+  from: b.from,
+  to: b.to,
+  departure: b.departure,
+  arrival: b.arrival,
+  duration: b.duration,
+  price: b.price,
+  seats: b.seats,
+  stops: b.stops,
+});
+
+const hydrateSchedule = (schedule: Schedule, operator: BusOperator | undefined): Bus => ({
+  ...schedule,
+  poName: operator?.poName ?? '',
+  poPhone: operator?.poPhone ?? '',
+  amenities: operator?.amenities ?? [],
+});
 
 const CityFormFields = ({
   value,
@@ -74,13 +98,50 @@ const CityFormFields = ({
   </div>
 );
 
+type BusOperatorFormValue = {
+  poName: string;
+  poPhone: string;
+};
+
+const BusOperatorFormFields = ({
+  value,
+  onChange,
+}: {
+  value: BusOperatorFormValue;
+  onChange: (v: BusOperatorFormValue) => void;
+}) => (
+  <div className="space-y-4">
+    <div className="space-y-2">
+      <Label htmlFor="po-name">Nama PO Bis</Label>
+      <Input
+        id="po-name"
+        value={value.poName}
+        onChange={(e) => onChange({ ...value, poName: e.target.value })}
+        placeholder="Contoh: Bis Jaya Indah"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor="po-phone" className="flex items-center gap-2">
+        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+        Nomor WhatsApp
+      </Label>
+      <Input
+        id="po-phone"
+        value={value.poPhone}
+        onChange={(e) => onChange({ ...value, poPhone: e.target.value })}
+        placeholder="Contoh: 081234567890"
+      />
+    </div>
+  </div>
+);
+
 type BusStopFormValue = {
   city: string;
   price: number;
 };
 
-type BusFormValue = {
-  poName: string;
+type ScheduleFormValue = {
+  busId: string;
   from: string;
   to: string;
   departure: string;
@@ -89,14 +150,16 @@ type BusFormValue = {
   stops: BusStopFormValue[];
 };
 
-const BusFormFields = ({
+const ScheduleFormFields = ({
   value,
   onChange,
   cities,
+  buses,
 }: {
-  value: BusFormValue;
-  onChange: (v: BusFormValue) => void;
+  value: ScheduleFormValue;
+  onChange: (v: ScheduleFormValue) => void;
   cities: City[];
+  buses: BusOperator[];
 }) => {
   const updateStop = (index: number, patch: Partial<BusStopFormValue>) => {
     onChange({
@@ -114,157 +177,161 @@ const BusFormFields = ({
   };
 
   return (
-  <div className="space-y-4">
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="po-name">Nama PO Bis</Label>
-        <Input
-          id="po-name"
-          value={value.poName}
-          onChange={(e) => onChange({ ...value, poName: e.target.value })}
-          placeholder="Contoh: Bis Jaya Indah"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="bus-from">Kota Asal</Label>
-        <Select value={value.from} onValueChange={(v) => onChange({ ...value, from: v })}>
-          <SelectTrigger id="bus-from">
-            <SelectValue placeholder="Pilih kota asal" />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((city) => (
-              <SelectItem key={city.id} value={city.name}>
-                {city.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="bus-to">Kota Tujuan</Label>
-        <Select value={value.to} onValueChange={(v) => onChange({ ...value, to: v })}>
-          <SelectTrigger id="bus-to">
-            <SelectValue placeholder="Pilih kota tujuan" />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((city) => (
-              <SelectItem key={`to-${city.id}`} value={city.name}>
-                {city.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="bus-departure" className="flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-          Jam Berangkat
-        </Label>
-        <Input
-          id="bus-departure"
-          type="time"
-          value={value.departure}
-          onChange={(e) => onChange({ ...value, departure: e.target.value })}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="bus-arrival" className="flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-          Jam Tiba
-        </Label>
-        <Input
-          id="bus-arrival"
-          type="time"
-          value={value.arrival}
-          onChange={(e) => onChange({ ...value, arrival: e.target.value })}
-        />
-      </div>
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="bus-price" className="flex items-center gap-2">
-          <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
-          Harga Tiket (Rp)
-        </Label>
-        <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
-            Rp
-          </span>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="schedule-bus">Bis</Label>
+          <Select value={value.busId} onValueChange={(v) => onChange({ ...value, busId: v })}>
+            <SelectTrigger id="schedule-bus">
+              <SelectValue placeholder="Pilih bis" />
+            </SelectTrigger>
+            <SelectContent>
+              {buses.map((bus) => (
+                <SelectItem key={bus.id} value={bus.id}>
+                  {bus.poName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {buses.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Belum ada data bis. Tambahkan bis di tab &quot;Bis&quot; terlebih dahulu.
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="schedule-from">Kota Asal</Label>
+          <Select value={value.from} onValueChange={(v) => onChange({ ...value, from: v })}>
+            <SelectTrigger id="schedule-from">
+              <SelectValue placeholder="Pilih kota asal" />
+            </SelectTrigger>
+            <SelectContent>
+              {cities.map((city) => (
+                <SelectItem key={city.id} value={city.name}>
+                  {city.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="schedule-to">Kota Tujuan</Label>
+          <Select value={value.to} onValueChange={(v) => onChange({ ...value, to: v })}>
+            <SelectTrigger id="schedule-to">
+              <SelectValue placeholder="Pilih kota tujuan" />
+            </SelectTrigger>
+            <SelectContent>
+              {cities.map((city) => (
+                <SelectItem key={`to-${city.id}`} value={city.name}>
+                  {city.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="schedule-departure" className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            Jam Berangkat
+          </Label>
           <Input
-            id="bus-price"
-            inputMode="numeric"
-            value={formatNumber(value.price)}
-            onChange={(e) => onChange({ ...value, price: parseNumber(e.target.value) })}
-            className="pl-10 tabular-nums"
-            placeholder="150.000"
+            id="schedule-departure"
+            type="time"
+            value={value.departure}
+            onChange={(e) => onChange({ ...value, departure: e.target.value })}
           />
         </div>
-      </div>
-    </div>
-
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label>Titik Berhenti (opsional)</Label>
-        <Button type="button" variant="outline" size="sm" onClick={addStop} className="gap-1 h-7 px-2 text-xs">
-          <Plus className="h-3.5 w-3.5" />
-          Tambah Titik Berhenti
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Rute resmi tetap {value.from || '...'} - {value.to || '...'}. Titik berhenti dipakai kalau
-        penumpang turun di kota tengah rute dengan harga yang berbeda dari harga tiket penuh.
-      </p>
-      {value.stops.length > 0 && (
-        <div className="space-y-2 pt-1">
-          {value.stops.map((stop, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Select
-                value={stop.city}
-                onValueChange={(v) => updateStop(index, { city: v })}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Pilih kota berhenti" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cities.map((city) => (
-                    <SelectItem key={`stop-${index}-${city.id}`} value={city.name}>
-                      {city.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="relative w-36">
-                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
-                  Rp
-                </span>
-                <Input
-                  inputMode="numeric"
-                  value={formatNumber(stop.price)}
-                  onChange={(e) => updateStop(index, { price: parseNumber(e.target.value) })}
-                  className="pl-10 tabular-nums"
-                  placeholder="10.000"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => removeStop(index)}
-                className="h-9 w-9 shrink-0 hover:text-destructive"
-                aria-label="Hapus titik berhenti"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+        <div className="space-y-2">
+          <Label htmlFor="schedule-arrival" className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            Jam Tiba
+          </Label>
+          <Input
+            id="schedule-arrival"
+            type="time"
+            value={value.arrival}
+            onChange={(e) => onChange({ ...value, arrival: e.target.value })}
+          />
         </div>
-      )}
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="schedule-price" className="flex items-center gap-2">
+            <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
+            Harga Tiket (Rp)
+          </Label>
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
+              Rp
+            </span>
+            <Input
+              id="schedule-price"
+              inputMode="numeric"
+              value={formatNumber(value.price)}
+              onChange={(e) => onChange({ ...value, price: parseNumber(e.target.value) })}
+              className="pl-10 tabular-nums"
+              placeholder="150.000"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Titik Berhenti (opsional)</Label>
+          <Button type="button" variant="outline" size="sm" onClick={addStop} className="gap-1 h-7 px-2 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            Tambah Titik Berhenti
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Rute resmi tetap {value.from || '...'} - {value.to || '...'}. Titik berhenti dipakai kalau
+          penumpang turun di tengah rute dengan harga yang berbeda dari harga tiket penuh — nama
+          areanya bebas, tidak harus kota yang terdaftar.
+        </p>
+        {value.stops.length > 0 && (
+          <div className="space-y-2 pt-1">
+            {value.stops.map((stop, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  value={stop.city}
+                  onChange={(e) => updateStop(index, { city: e.target.value })}
+                  placeholder="Contoh: Pasuruan, SPBU Purwosari, dll"
+                  className="flex-1"
+                />
+                <div className="relative w-36">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
+                    Rp
+                  </span>
+                  <Input
+                    inputMode="numeric"
+                    value={formatNumber(stop.price)}
+                    onChange={(e) => updateStop(index, { price: parseNumber(e.target.value) })}
+                    className="pl-10 tabular-nums"
+                    placeholder="10.000"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeStop(index)}
+                  className="h-9 w-9 shrink-0 hover:text-destructive"
+                  aria-label="Hapus titik berhenti"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
   );
 };
 
 const EMPTY_CITY: Omit<City, 'id'> = { name: '', province: '' };
-const EMPTY_BUS: BusFormValue = {
-  poName: '',
+const EMPTY_BUS_OPERATOR: BusOperatorFormValue = { poName: '', poPhone: '' };
+const EMPTY_SCHEDULE: ScheduleFormValue = {
+  busId: '',
   from: '',
   to: '',
   departure: '',
@@ -277,18 +344,21 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<AdminTab>('cities');
 
   const [cities, setCities] = useState<City[]>([]);
-  const [buses, setBuses] = useState<Bus[]>([]);
+  const [busOperators, setBusOperators] = useState<BusOperator[]>([]);
+  const [schedules, setSchedules] = useState<Bus[]>([]);
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editId, setEditId] = useState<string | null>(null);
 
   const [cityForm, setCityForm] = useState<Omit<City, 'id'>>(EMPTY_CITY);
-  const [busForm, setBusForm] = useState<BusFormValue>(EMPTY_BUS);
+  const [busOperatorForm, setBusOperatorForm] = useState<BusOperatorFormValue>(EMPTY_BUS_OPERATOR);
+  const [scheduleForm, setScheduleForm] = useState<ScheduleFormValue>(EMPTY_SCHEDULE);
 
   const [loading, setLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState<Record<AdminTab, boolean>>({
     cities: false,
     buses: false,
+    schedules: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -305,12 +375,18 @@ export default function AdminDashboard() {
     try {
       if (targetTab === 'cities') {
         setCities(await getCities());
+      } else if (targetTab === 'buses') {
+        setBusOperators(await getBusOperators());
       } else {
         if (!initialLoadDone.cities) {
           setCities(await getCities());
           setInitialLoadDone((s) => ({ ...s, cities: true }));
         }
-        setBuses(await getBuses());
+        if (!initialLoadDone.buses) {
+          setBusOperators(await getBusOperators());
+          setInitialLoadDone((s) => ({ ...s, buses: true }));
+        }
+        setSchedules(await getSchedules());
       }
       setInitialLoadDone((s) => ({ ...s, [targetTab]: true }));
     } catch (err) {
@@ -333,27 +409,32 @@ export default function AdminDashboard() {
     setEditId(null);
     setError(null);
     setCityForm(EMPTY_CITY);
-    setBusForm(EMPTY_BUS);
+    setBusOperatorForm(EMPTY_BUS_OPERATOR);
+    setScheduleForm(EMPTY_SCHEDULE);
   };
 
-  const openEdit = (item: City | Bus) => {
+  const openEdit = (item: City | BusOperator | Bus) => {
     setModalMode('edit');
     setError(null);
     if (tab === 'cities') {
       const c = item as City;
       setEditId(c.id);
       setCityForm({ name: c.name, province: c.province });
-    } else {
-      const b = item as Bus;
+    } else if (tab === 'buses') {
+      const b = item as BusOperator;
       setEditId(b.id);
-      setBusForm({
-        poName: b.poName,
-        from: b.from,
-        to: b.to,
-        departure: b.departure,
-        arrival: b.arrival,
-        price: b.price,
-        stops: b.stops ? b.stops.map((s) => ({ city: s.city, price: s.price })) : [],
+      setBusOperatorForm({ poName: b.poName, poPhone: b.poPhone });
+    } else {
+      const s = item as Bus;
+      setEditId(s.id);
+      setScheduleForm({
+        busId: s.busId,
+        from: s.from,
+        to: s.to,
+        departure: s.departure,
+        arrival: s.arrival,
+        price: s.price,
+        stops: s.stops ? s.stops.map((st) => ({ city: st.city, price: st.price })) : [],
       });
     }
   };
@@ -393,56 +474,89 @@ export default function AdminDashboard() {
           setCities(next);
           setSuccess('Kota berhasil diperbarui');
         }
-      } else {
-        if (
-          !busForm.poName.trim() ||
-          !busForm.from.trim() ||
-          !busForm.to.trim() ||
-          !busForm.departure.trim() ||
-          !busForm.arrival.trim()
-        ) {
-          throw new Error('Semua field wajib harus diisi dengan benar');
+      } else if (tab === 'buses') {
+        if (!busOperatorForm.poName.trim()) {
+          throw new Error('Nama PO Bis wajib diisi');
         }
-        const stops = busForm.stops
-          .filter((s) => s.city.trim())
-          .map((s) => ({ city: s.city.trim(), price: s.price }));
         if (modalMode === 'create') {
-          const created: Bus = {
-            id: generateId('BIS', buses),
-            poName: busForm.poName.trim(),
-            poPhone: '',
-            from: busForm.from.trim(),
-            to: busForm.to.trim(),
-            departure: busForm.departure.trim(),
-            arrival: busForm.arrival.trim(),
-            duration: '',
-            price: busForm.price,
-            seats: { available: 0, total: 0 },
+          const created: BusOperator = {
+            id: generateId('BIS', busOperators),
+            poName: busOperatorForm.poName.trim(),
+            poPhone: busOperatorForm.poPhone.trim(),
             amenities: [],
-            stops: stops.length > 0 ? stops : undefined,
           };
-          const next = [...buses, created];
-          await saveBuses(next);
-          setBuses(next);
+          const next = [...busOperators, created];
+          await saveBusOperators(next);
+          setBusOperators(next);
           setSuccess('Bis berhasil ditambahkan');
         } else if (modalMode === 'edit' && editId) {
-          const next = buses.map((b) =>
+          const next = busOperators.map((b) =>
             b.id === editId
               ? {
                   ...b,
-                  poName: busForm.poName.trim(),
-                  from: busForm.from.trim(),
-                  to: busForm.to.trim(),
-                  departure: busForm.departure.trim(),
-                  arrival: busForm.arrival.trim(),
-                  price: busForm.price,
-                  stops: stops.length > 0 ? stops : undefined,
+                  poName: busOperatorForm.poName.trim(),
+                  poPhone: busOperatorForm.poPhone.trim(),
                 }
               : b
           );
-          await saveBuses(next);
-          setBuses(next);
+          await saveBusOperators(next);
+          setBusOperators(next);
           setSuccess('Bis berhasil diperbarui');
+        }
+      } else {
+        if (
+          !scheduleForm.busId ||
+          !scheduleForm.from.trim() ||
+          !scheduleForm.to.trim() ||
+          !scheduleForm.departure.trim() ||
+          !scheduleForm.arrival.trim()
+        ) {
+          throw new Error('Semua field wajib harus diisi dengan benar');
+        }
+        const stops = scheduleForm.stops
+          .filter((s) => s.city.trim())
+          .map((s) => ({ city: s.city.trim(), price: s.price }));
+        const operator = busOperators.find((b) => b.id === scheduleForm.busId);
+        if (modalMode === 'create') {
+          const created: Schedule = {
+            id: generateId('JDW', schedules),
+            busId: scheduleForm.busId,
+            from: scheduleForm.from.trim(),
+            to: scheduleForm.to.trim(),
+            departure: scheduleForm.departure.trim(),
+            arrival: scheduleForm.arrival.trim(),
+            duration: '',
+            price: scheduleForm.price,
+            seats: { available: 0, total: 0 },
+            stops: stops.length > 0 ? stops : undefined,
+          };
+          const next = [...schedules, hydrateSchedule(created, operator)];
+          await saveSchedules(next.map(toSchedule));
+          setSchedules(next);
+          setSuccess('Jadwal berhasil ditambahkan');
+        } else if (modalMode === 'edit' && editId) {
+          const next = schedules.map((s) =>
+            s.id === editId
+              ? hydrateSchedule(
+                  {
+                    id: s.id,
+                    busId: scheduleForm.busId,
+                    from: scheduleForm.from.trim(),
+                    to: scheduleForm.to.trim(),
+                    departure: scheduleForm.departure.trim(),
+                    arrival: scheduleForm.arrival.trim(),
+                    duration: s.duration,
+                    price: scheduleForm.price,
+                    seats: s.seats,
+                    stops: stops.length > 0 ? stops : undefined,
+                  },
+                  operator
+                )
+              : s
+          );
+          await saveSchedules(next.map(toSchedule));
+          setSchedules(next);
+          setSuccess('Jadwal berhasil diperbarui');
         }
       }
       closeModal();
@@ -464,10 +578,20 @@ export default function AdminDashboard() {
         const next = cities.filter((c) => c.id !== id);
         await saveCities(next);
         setCities(next);
+      } else if (tab === 'buses') {
+        const nextOperators = busOperators.filter((b) => b.id !== id);
+        await saveBusOperators(nextOperators);
+        setBusOperators(nextOperators);
+        // A schedule without its bus operator has nothing to display — drop them together.
+        const nextSchedules = schedules.filter((s) => s.busId !== id);
+        if (nextSchedules.length !== schedules.length) {
+          await saveSchedules(nextSchedules.map(toSchedule));
+          setSchedules(nextSchedules);
+        }
       } else {
-        const next = buses.filter((b) => b.id !== id);
-        await saveBuses(next);
-        setBuses(next);
+        const next = schedules.filter((s) => s.id !== id);
+        await saveSchedules(next.map(toSchedule));
+        setSchedules(next);
       }
       setSuccess('Data berhasil dihapus');
     } catch (err) {
@@ -504,13 +628,20 @@ export default function AdminDashboard() {
       ? modalMode === 'create'
         ? 'Tambah Kota Baru'
         : 'Edit Kota'
-      : modalMode === 'create'
-        ? 'Tambah Bis Baru'
-        : 'Edit Bis';
+      : tab === 'buses'
+        ? modalMode === 'create'
+          ? 'Tambah Bis Baru'
+          : 'Edit Bis'
+        : modalMode === 'create'
+          ? 'Tambah Jadwal Baru'
+          : 'Edit Jadwal';
 
-  const currentList = tab === 'cities' ? cities : buses;
-  const totalAll = useMemo(() => cities.length + buses.length, [cities, buses]);
-  const statsReady = initialLoadDone.cities && initialLoadDone.buses;
+  const currentList = tab === 'cities' ? cities : tab === 'buses' ? busOperators : schedules;
+  const totalAll = useMemo(
+    () => cities.length + busOperators.length + schedules.length,
+    [cities, busOperators, schedules]
+  );
+  const statsReady = initialLoadDone.cities && initialLoadDone.buses && initialLoadDone.schedules;
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -526,7 +657,7 @@ export default function AdminDashboard() {
                   Dashboard Admin
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Kelola data kota dan bis
+                  Kelola data kota, bis, dan jadwal
                 </p>
               </div>
             </div>
@@ -534,8 +665,12 @@ export default function AdminDashboard() {
           <div className="flex flex-wrap gap-2 self-start sm:self-auto">
             <Button
               onClick={() => {
-                setInitialLoadDone({ cities: false, buses: false });
-                void Promise.all([loadData('cities', true), loadData('buses', true)]);
+                setInitialLoadDone({ cities: false, buses: false, schedules: false });
+                void Promise.all([
+                  loadData('cities', true),
+                  loadData('buses', true),
+                  loadData('schedules', true),
+                ]);
               }}
               variant="outline"
               className="gap-2"
@@ -551,7 +686,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-background border-primary/20">
             <CardContent className="p-5 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
@@ -577,7 +712,22 @@ export default function AdminDashboard() {
                   Total Bis
                 </p>
                 <p className="font-heading text-2xl font-bold text-card-foreground">
-                  {statsReady ? buses.length : '—'}
+                  {statsReady ? busOperators.length : '—'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-secondary to-background border-secondary/30">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary-foreground/10">
+                <CalendarClock className="h-6 w-6 text-secondary-foreground" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Total Jadwal
+                </p>
+                <p className="font-heading text-2xl font-bold text-card-foreground">
+                  {statsReady ? schedules.length : '—'}
                 </p>
               </div>
             </CardContent>
@@ -620,13 +770,25 @@ export default function AdminDashboard() {
                   <BusIcon className="h-4 w-4" />
                   Bis
                   <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
-                    {initialLoadDone.buses ? buses.length : '?'}
+                    {initialLoadDone.buses ? busOperators.length : '?'}
+                  </Badge>
+                </Button>
+                <Button
+                  variant={tab === 'schedules' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => switchTab('schedules')}
+                  className="gap-2 h-8"
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Jadwal
+                  <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
+                    {initialLoadDone.schedules ? schedules.length : '?'}
                   </Badge>
                 </Button>
               </div>
               <Button onClick={openCreate} className="gap-2 self-start sm:self-auto">
                 <Plus className="h-4 w-4" />
-                Tambah {tab === 'cities' ? 'Kota' : 'Bis'}
+                Tambah {tab === 'cities' ? 'Kota' : tab === 'buses' ? 'Bis' : 'Jadwal'}
               </Button>
             </div>
           </CardHeader>
@@ -642,8 +804,10 @@ export default function AdminDashboard() {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                   {tab === 'cities' ? (
                     <MapPin className="h-8 w-8" />
-                  ) : (
+                  ) : tab === 'buses' ? (
                     <BusIcon className="h-8 w-8" />
+                  ) : (
+                    <CalendarClock className="h-8 w-8" />
                   )}
                 </div>
                 <h3 className="font-semibold text-card-foreground mb-1">
@@ -694,6 +858,37 @@ export default function AdminDashboard() {
                     <thead className="bg-muted/50 text-left">
                       <tr>
                         <th className="px-4 py-3 font-semibold text-muted-foreground w-24">ID</th>
+                        <th className="px-4 py-3 font-semibold text-muted-foreground">Nama PO Bis</th>
+                        <th className="px-4 py-3 font-semibold text-muted-foreground">Telepon</th>
+                        <th className="px-4 py-3 font-semibold text-muted-foreground text-right w-28">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {busOperators.map((bus) => (
+                        <tr key={bus.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{bus.id}</td>
+                          <td className="px-4 py-3 font-medium text-card-foreground">{bus.poName}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{bus.poPhone || '-'}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="inline-flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openEdit(bus)} className="h-8 w-8 hover:text-primary" aria-label="Edit bis">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(bus.id)} className="h-8 w-8 hover:text-destructive" aria-label="Hapus bis">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {tab === 'schedules' && (
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-left">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold text-muted-foreground w-24">ID</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">PO Bis</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Rute</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Jam</th>
@@ -703,24 +898,24 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {buses.map((bus) => (
-                        <tr key={bus.id} className="hover:bg-muted/30 align-top">
-                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{bus.id}</td>
+                      {schedules.map((schedule) => (
+                        <tr key={schedule.id} className="hover:bg-muted/30 align-top">
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{schedule.id}</td>
                           <td className="px-4 py-3">
-                            <p className="font-medium text-card-foreground">{bus.poName}</p>
+                            <p className="font-medium text-card-foreground">{schedule.poName}</p>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-card-foreground">{bus.from}</span>
+                            <span className="text-card-foreground">{schedule.from}</span>
                             <span className="mx-1 text-muted-foreground">→</span>
-                            <span className="text-card-foreground">{bus.to}</span>
+                            <span className="text-card-foreground">{schedule.to}</span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <p className="text-card-foreground">{bus.departure} - {bus.arrival}</p>
+                            <p className="text-card-foreground">{schedule.departure} - {schedule.arrival}</p>
                           </td>
                           <td className="px-4 py-3">
-                            {bus.stops && bus.stops.length > 0 ? (
+                            {schedule.stops && schedule.stops.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
-                                {bus.stops.map((s) => (
+                                {schedule.stops.map((s) => (
                                   <Badge key={s.city} variant="outline" className="font-normal">
                                     {s.city} · Rp{s.price.toLocaleString('id-ID')}
                                   </Badge>
@@ -731,14 +926,14 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right font-semibold text-card-foreground whitespace-nowrap tabular-nums">
-                            Rp {bus.price.toLocaleString('id-ID')}
+                            Rp {schedule.price.toLocaleString('id-ID')}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="inline-flex gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEdit(bus)} className="h-8 w-8 hover:text-primary" aria-label="Edit bis">
+                              <Button variant="ghost" size="icon" onClick={() => openEdit(schedule)} className="h-8 w-8 hover:text-primary" aria-label="Edit jadwal">
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(bus.id)} className="h-8 w-8 hover:text-destructive" aria-label="Hapus bis">
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(schedule.id)} className="h-8 w-8 hover:text-destructive" aria-label="Hapus jadwal">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -780,7 +975,15 @@ export default function AdminDashboard() {
                 <CityFormFields value={cityForm} onChange={setCityForm} />
               )}
               {tab === 'buses' && (
-                <BusFormFields value={busForm} onChange={setBusForm} cities={cities} />
+                <BusOperatorFormFields value={busOperatorForm} onChange={setBusOperatorForm} />
+              )}
+              {tab === 'schedules' && (
+                <ScheduleFormFields
+                  value={scheduleForm}
+                  onChange={setScheduleForm}
+                  cities={cities}
+                  buses={busOperators}
+                />
               )}
             </div>
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-border bg-muted/20 rounded-b-2xl">

@@ -8,10 +8,18 @@ export interface BusStop {
   price: number;
 }
 
-export interface Bus {
+/** Master data for a bus/PO — reusable across many schedules. */
+export interface BusOperator {
   id: string;
   poName: string;
   poPhone: string;
+  amenities: string[];
+}
+
+/** A single trip entry ("jadwal"): a bus operator running a specific route/time/price. */
+export interface Schedule {
+  id: string;
+  busId: string;
   from: string;
   to: string;
   departure: string;
@@ -19,8 +27,18 @@ export interface Bus {
   duration?: string;
   price: number;
   seats: BusSeats;
-  amenities: string[];
   stops?: BusStop[];
+}
+
+/**
+ * A schedule flattened with its operator's info — the shape used everywhere
+ * schedules are displayed or searched (homepage results, admin "Jadwal" list).
+ * Never written back as-is; admin writes persist the `Schedule` fields only.
+ */
+export interface Bus extends Schedule {
+  poName: string;
+  poPhone: string;
+  amenities: string[];
   /**
    * Set only on a search-result bus that matched via an intermediate stop
    * instead of its official `to` — holds that official terminus so the UI

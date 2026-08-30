@@ -4,20 +4,7 @@
       "id": "BIS013",
       "poName": "Bis Tentrem",
       "poPhone": "",
-      "from": "Malang",
-      "to": "Surabaya",
-      "departure": "05:03",
-      "arrival": "07:30",
-      "duration": "",
-      "price": 20000,
-      "seats": {
-        "available": 0,
-        "total": 0
-      },
-      "amenities": [],
-      "stops": [
-        { "city": "Pasuruan", "price": 10000 }
-      ]
+      "amenities": []
     }
   ]
 }

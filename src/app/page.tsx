@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SearchForm } from '@/components/SearchForm';
 import { BusList } from '@/components/BusList';
-import { getCities, getBuses } from '@/lib/sqlite-db';
+import { getCities, getSchedules } from '@/lib/sqlite-db';
 import { City, Bus } from '@/types';
 import { searchBuses } from '@/utils/searchBuses';
 import { formatDateLong } from '@/utils/formatters';
@@ -46,7 +46,7 @@ export default function HomePage() {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const [citiesRes, busesRes] = await Promise.all([getCities(), getBuses()]);
+        const [citiesRes, busesRes] = await Promise.all([getCities(), getSchedules()]);
         setCities(citiesRes);
         setBuses(busesRes);
       } catch {
