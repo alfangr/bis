@@ -11,13 +11,13 @@ export const metadata: Metadata = {
     template: `%s | ${BRAND_NAME} Bis`,
   },
   description:
-    'Platform informasi jadwal dan harga tiket bis antar kota terlengkap. Cari, bandingkan, dan pesan tiket bis dengan mudah dan terpercaya.',
+    'Info jadwal dan harga tiket bis antar kota di Indonesia. Cari rute, jam berangkat, dan kelas bis (Ekonomi & Patas) dengan mudah.',
   keywords: ['bis', 'tiket bis', 'jadwal bis', 'antar kota', 'PO bis', 'informakita'],
   authors: [{ name: BRAND_NAME }],
   openGraph: {
     title: `${BRAND_NAME} Bis — Informasi Jadwal & Harga Tiket Bis Antar Kota`,
     description:
-      'Platform informasi jadwal dan harga tiket bis antar kota terlengkap. Cari, bandingkan, dan pesan tiket bis dengan mudah.',
+      'Info jadwal dan harga tiket bis antar kota di Indonesia. Cari rute, jam berangkat, dan kelas bis (Ekonomi & Patas) dengan mudah.',
     url: SITE_URL,
     siteName: `${BRAND_NAME} Bis`,
     locale: 'id_ID',

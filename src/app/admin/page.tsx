@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Clock,
   Banknote,
-  Phone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Bus, BusOperator, City } from '@/types';
+import type { Bus, BusClass, BusOperator, City } from '@/types';
+
+const BUS_CLASSES: BusClass[] = ['Ekonomi', 'Patas'];
 
 type AdminTab = 'cities' | 'buses' | 'schedules';
 type ModalMode = 'create' | 'edit' | null;
@@ -86,7 +87,6 @@ const CityFormFields = ({
 
 type BusOperatorFormValue = {
   poName: string;
-  poPhone: string;
 };
 
 const BusOperatorFormFields = ({
@@ -106,18 +106,6 @@ const BusOperatorFormFields = ({
         placeholder="Contoh: Bis Jaya Indah"
       />
     </div>
-    <div className="space-y-2">
-      <Label htmlFor="po-phone" className="flex items-center gap-2">
-        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-        Nomor WhatsApp
-      </Label>
-      <Input
-        id="po-phone"
-        value={value.poPhone}
-        onChange={(e) => onChange({ ...value, poPhone: e.target.value })}
-        placeholder="Contoh: 081234567890"
-      />
-    </div>
   </div>
 );
 
@@ -128,6 +116,7 @@ type BusStopFormValue = {
 
 type ScheduleFormValue = {
   busId: string;
+  busClass: BusClass;
   from: string;
   to: string;
   departure: string;
@@ -184,6 +173,24 @@ const ScheduleFormFields = ({
               Belum ada data bis. Tambahkan bis di tab &quot;Bis&quot; terlebih dahulu.
             </p>
           )}
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="schedule-class">Kelas Bis</Label>
+          <Select
+            value={value.busClass}
+            onValueChange={(v) => onChange({ ...value, busClass: v as BusClass })}
+          >
+            <SelectTrigger id="schedule-class">
+              <SelectValue placeholder="Pilih kelas bis" />
+            </SelectTrigger>
+            <SelectContent>
+              {BUS_CLASSES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="schedule-from">Kota Asal</Label>
@@ -315,9 +322,10 @@ const ScheduleFormFields = ({
 };
 
 const EMPTY_CITY: Omit<City, 'id'> = { name: '', province: '' };
-const EMPTY_BUS_OPERATOR: BusOperatorFormValue = { poName: '', poPhone: '' };
+const EMPTY_BUS_OPERATOR: BusOperatorFormValue = { poName: '' };
 const EMPTY_SCHEDULE: ScheduleFormValue = {
   busId: '',
+  busClass: 'Ekonomi',
   from: '',
   to: '',
   departure: '',
@@ -350,7 +358,11 @@ export default function AdminDashboard() {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadData(tab, true);
+    void Promise.all([
+      loadData('cities', true),
+      loadData('buses', true),
+      loadData('schedules', true),
+    ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -409,12 +421,13 @@ export default function AdminDashboard() {
     } else if (tab === 'buses') {
       const b = item as BusOperator;
       setEditId(b.id);
-      setBusOperatorForm({ poName: b.poName, poPhone: b.poPhone });
+      setBusOperatorForm({ poName: b.poName });
     } else {
       const s = item as Bus;
       setEditId(s.id);
       setScheduleForm({
         busId: s.busId,
+        busClass: s.busClass,
         from: s.from,
         to: s.to,
         departure: s.departure,
@@ -774,7 +787,6 @@ export default function AdminDashboard() {
                       <tr>
                         <th className="px-4 py-3 font-semibold text-muted-foreground w-24">ID</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Nama PO Bis</th>
-                        <th className="px-4 py-3 font-semibold text-muted-foreground">Telepon</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground text-right w-28">Aksi</th>
                       </tr>
                     </thead>
@@ -783,7 +795,6 @@ export default function AdminDashboard() {
                         <tr key={bus.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{bus.id}</td>
                           <td className="px-4 py-3 font-medium text-card-foreground">{bus.poName}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{bus.poPhone || '-'}</td>
                           <td className="px-4 py-3 text-right">
                             <div className="inline-flex gap-1">
                               <Button variant="ghost" size="icon" onClick={() => openEdit(bus)} className="h-8 w-8 hover:text-primary" aria-label="Edit bis">
@@ -805,6 +816,7 @@ export default function AdminDashboard() {
                       <tr>
                         <th className="px-4 py-3 font-semibold text-muted-foreground w-24">ID</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">PO Bis</th>
+                        <th className="px-4 py-3 font-semibold text-muted-foreground">Kelas</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Rute</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Jam</th>
                         <th className="px-4 py-3 font-semibold text-muted-foreground">Titik Berhenti</th>
@@ -818,6 +830,11 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{schedule.id}</td>
                           <td className="px-4 py-3">
                             <p className="font-medium text-card-foreground">{schedule.poName}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className="font-normal">
+                              {schedule.busClass}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-card-foreground">{schedule.from}</span>

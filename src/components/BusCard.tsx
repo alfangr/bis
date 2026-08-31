@@ -7,12 +7,9 @@ import {
   CardHeader,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   ArrowRight,
-  Phone,
-  MessageCircle,
   AlertTriangle,
   CheckCircle2,
   MapPinned,
@@ -25,12 +22,6 @@ interface BusCardProps {
 export const BusCard = ({ bus }: BusCardProps) => {
   const availablePct = Math.round((bus.seats.available / bus.seats.total) * 100);
   const isLow = availablePct <= 20;
-  const whatsappMsg = encodeURIComponent(
-    `Halo ${bus.poName}, saya ingin pesan tiket bis rute ${bus.from} - ${bus.to} pada jam ${bus.departure}. (via bis.informakita.my.id)`
-  );
-  const waLink = bus.poPhone.startsWith('08')
-    ? `https://wa.me/62${bus.poPhone.slice(1)}?text=${whatsappMsg}`
-    : `https://wa.me/${bus.poPhone}?text=${whatsappMsg}`;
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
@@ -40,11 +31,10 @@ export const BusCard = ({ bus }: BusCardProps) => {
             <h3 className="font-heading text-lg font-bold text-card-foreground">
               {bus.poName}
             </h3>
+            <Badge variant="outline" className="font-normal">
+              {bus.busClass}
+            </Badge>
           </div>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Phone className="h-3 w-3" />
-            {bus.poPhone}
-          </p>
         </div>
         <Badge
           variant={isLow ? 'destructive' : 'secondary'}
@@ -117,7 +107,7 @@ export const BusCard = ({ bus }: BusCardProps) => {
         </div>
       </CardContent>
 
-      <CardFooter className="flex flex-col items-stretch justify-between gap-3 bg-muted/30 sm:flex-row sm:items-center">
+      <CardFooter className="bg-muted/30">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Harga
@@ -126,17 +116,6 @@ export const BusCard = ({ bus }: BusCardProps) => {
             {formatCurrencyShort(bus.price)}
           </p>
         </div>
-        <Button asChild className="w-full sm:w-auto">
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="gap-2"
-          >
-            <MessageCircle className="h-5 w-5" />
-            Pesan Sekarang
-          </a>
-        </Button>
       </CardFooter>
     </Card>
   );

@@ -8,15 +8,14 @@ type Params = { params: { id: string } };
 
 export async function PUT(req: Request, { params }: Params): Promise<NextResponse<BusOperator | { error: string }>> {
   try {
-    const body = (await req.json()) as Partial<{ poName: unknown; poPhone: unknown }>;
+    const body = (await req.json()) as Partial<{ poName: unknown }>;
     const poName = typeof body.poName === 'string' ? body.poName.trim() : undefined;
-    const poPhone = typeof body.poPhone === 'string' ? body.poPhone.trim() : undefined;
 
     if (poName === '') {
       return NextResponse.json({ error: 'Nama PO Bis tidak boleh kosong' }, { status: 400 });
     }
 
-    const updated = await updateBusOperator(params.id, { poName, poPhone });
+    const updated = await updateBusOperator(params.id, { poName });
     if (!updated) {
       return NextResponse.json({ error: 'Bus not found' }, { status: 404 });
     }

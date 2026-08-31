@@ -1,12 +1,6 @@
 export const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'Informakita';
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://bis.informakita.my.id';
 
-export const STATS = {
-  cities: 10,
-  buses: 14,
-  operators: 14,
-};
-
 export const SORT_OPTIONS = [
   { value: 'price-asc', label: 'Harga: Termurah' },
   { value: 'price-desc', label: 'Harga: Termahal' },

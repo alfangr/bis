@@ -8,11 +8,12 @@ export interface BusStop {
   price: number;
 }
 
+export type BusClass = 'Ekonomi' | 'Patas';
+
 /** Master data for a bus/PO — reusable across many schedules. */
 export interface BusOperator {
   id: string;
   poName: string;
-  poPhone: string;
   amenities: string[];
 }
 
@@ -20,6 +21,7 @@ export interface BusOperator {
 export interface Schedule {
   id: string;
   busId: string;
+  busClass: BusClass;
   from: string;
   to: string;
   departure: string;
@@ -37,7 +39,6 @@ export interface Schedule {
  */
 export interface Bus extends Schedule {
   poName: string;
-  poPhone: string;
   amenities: string[];
   /**
    * Set only on a search-result bus that matched via an intermediate stop

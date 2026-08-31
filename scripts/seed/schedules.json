@@ -3,6 +3,7 @@
     {
       "id": "JDW001",
       "busId": "BIS013",
+      "busClass": "Ekonomi",
       "from": "Malang",
       "to": "Surabaya",
       "departure": "05:03",

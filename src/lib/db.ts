@@ -1,5 +1,5 @@
 import { createClient, type Client } from '@libsql/client';
-import type { Bus, BusOperator, BusStop, City, Schedule } from '@/types';
+import type { Bus, BusClass, BusOperator, BusStop, City, Schedule } from '@/types';
 
 let client: Client | null = null;
 
@@ -24,7 +24,6 @@ const rowToCity = (row: Record<string, unknown>): City => ({
 const rowToBusOperator = (row: Record<string, unknown>): BusOperator => ({
   id: row.id as string,
   poName: row.po_name as string,
-  poPhone: row.po_phone as string,
   amenities: JSON.parse((row.amenities as string) || '[]'),
 });
 
@@ -32,8 +31,8 @@ const rowToBusOperator = (row: Record<string, unknown>): BusOperator => ({
 const rowToSchedule = (row: Record<string, unknown>): Bus => ({
   id: row.id as string,
   busId: row.bus_id as string,
+  busClass: row.class as BusClass,
   poName: row.po_name as string,
-  poPhone: row.po_phone as string,
   amenities: JSON.parse((row.amenities as string) || '[]'),
   from: row.from_city as string,
   to: row.to_city as string,
@@ -108,28 +107,27 @@ export const getBusOperators = async (): Promise<BusOperator[]> => {
 
 export const createBusOperator = async (input: {
   poName: string;
-  poPhone: string;
 }): Promise<BusOperator> => {
   const id = await generateId('BIS', 'buses');
-  const operator: BusOperator = { id, poName: input.poName, poPhone: input.poPhone, amenities: [] };
+  const operator: BusOperator = { id, poName: input.poName, amenities: [] };
   await getClient().execute({
-    sql: 'INSERT INTO buses (id, po_name, po_phone, amenities) VALUES (?, ?, ?, ?)',
-    args: [operator.id, operator.poName, operator.poPhone, JSON.stringify(operator.amenities)],
+    sql: 'INSERT INTO buses (id, po_name, amenities) VALUES (?, ?, ?)',
+    args: [operator.id, operator.poName, JSON.stringify(operator.amenities)],
   });
   return operator;
 };
 
 export const updateBusOperator = async (
   id: string,
-  patch: Partial<{ poName: string; poPhone: string }>
+  patch: Partial<{ poName: string }>
 ): Promise<BusOperator | null> => {
   const db = getClient();
   const existing = await db.execute({ sql: 'SELECT * FROM buses WHERE id = ?', args: [id] });
   if (existing.rows.length === 0) return null;
   const next = { ...rowToBusOperator(existing.rows[0]), ...patch };
   await db.execute({
-    sql: 'UPDATE buses SET po_name = ?, po_phone = ? WHERE id = ?',
-    args: [next.poName, next.poPhone, id],
+    sql: 'UPDATE buses SET po_name = ? WHERE id = ?',
+    args: [next.poName, id],
   });
   return next;
 };
@@ -146,7 +144,7 @@ export const deleteBusOperator = async (id: string): Promise<boolean> => {
 
 export const getSchedules = async (): Promise<Bus[]> => {
   const rs = await getClient().execute(
-    `SELECT s.*, b.po_name, b.po_phone, b.amenities
+    `SELECT s.*, b.po_name, b.amenities
      FROM schedules s
      JOIN buses b ON b.id = s.bus_id
      ORDER BY s.id`
@@ -156,6 +154,7 @@ export const getSchedules = async (): Promise<Bus[]> => {
 
 export type ScheduleInput = {
   busId: string;
+  busClass: BusClass;
   from: string;
   to: string;
   departure: string;
@@ -173,6 +172,7 @@ export const createSchedule = async (input: ScheduleInput): Promise<Bus | null> 
   const schedule: Schedule = {
     id: await generateId('JDW', 'schedules'),
     busId: input.busId,
+    busClass: input.busClass,
     from: input.from,
     to: input.to,
     departure: input.departure,
@@ -185,11 +185,12 @@ export const createSchedule = async (input: ScheduleInput): Promise<Bus | null> 
 
   await db.execute({
     sql: `INSERT INTO schedules
-      (id, bus_id, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, stops)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, bus_id, class, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, stops)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       schedule.id,
       schedule.busId,
+      schedule.busClass,
       schedule.from,
       schedule.to,
       schedule.departure,
@@ -202,7 +203,7 @@ export const createSchedule = async (input: ScheduleInput): Promise<Bus | null> 
     ],
   });
 
-  return { ...schedule, poName: operator.poName, poPhone: operator.poPhone, amenities: operator.amenities };
+  return { ...schedule, poName: operator.poName, amenities: operator.amenities };
 };
 
 export const updateSchedule = async (
@@ -211,14 +212,14 @@ export const updateSchedule = async (
 ): Promise<Bus | null> => {
   const db = getClient();
   const existingRs = await db.execute({
-    sql: `SELECT s.*, b.po_name, b.po_phone, b.amenities
+    sql: `SELECT s.*, b.po_name, b.amenities
           FROM schedules s JOIN buses b ON b.id = s.bus_id WHERE s.id = ?`,
     args: [id],
   });
   if (existingRs.rows.length === 0) return null;
   const current = rowToSchedule(existingRs.rows[0]);
 
-  let operator = { poName: current.poName, poPhone: current.poPhone, amenities: current.amenities };
+  let operator = { poName: current.poName, amenities: current.amenities };
   let busId = current.busId;
   if (patch.busId && patch.busId !== current.busId) {
     const operatorRs = await db.execute({ sql: 'SELECT * FROM buses WHERE id = ?', args: [patch.busId] });
@@ -226,7 +227,7 @@ export const updateSchedule = async (
       throw new Error('Bus tidak ditemukan');
     }
     const op = rowToBusOperator(operatorRs.rows[0]);
-    operator = { poName: op.poName, poPhone: op.poPhone, amenities: op.amenities };
+    operator = { poName: op.poName, amenities: op.amenities };
     busId = patch.busId;
   }
 
@@ -234,6 +235,7 @@ export const updateSchedule = async (
   const next: Schedule = {
     id: current.id,
     busId,
+    busClass: patch.busClass ?? current.busClass,
     from: patch.from ?? current.from,
     to: patch.to ?? current.to,
     departure: patch.departure ?? current.departure,
@@ -246,10 +248,11 @@ export const updateSchedule = async (
 
   await db.execute({
     sql: `UPDATE schedules
-          SET bus_id = ?, from_city = ?, to_city = ?, departure = ?, arrival = ?, price = ?, stops = ?
+          SET bus_id = ?, class = ?, from_city = ?, to_city = ?, departure = ?, arrival = ?, price = ?, stops = ?
           WHERE id = ?`,
     args: [
       next.busId,
+      next.busClass,
       next.from,
       next.to,
       next.departure,

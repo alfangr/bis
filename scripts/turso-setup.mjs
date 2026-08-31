@@ -34,12 +34,12 @@ async function main() {
       `CREATE TABLE IF NOT EXISTS buses (
         id        TEXT PRIMARY KEY,
         po_name   TEXT NOT NULL,
-        po_phone  TEXT NOT NULL DEFAULT '',
         amenities TEXT NOT NULL DEFAULT '[]'
       )`,
       `CREATE TABLE IF NOT EXISTS schedules (
         id              TEXT PRIMARY KEY,
         bus_id          TEXT NOT NULL REFERENCES buses(id),
+        class           TEXT NOT NULL DEFAULT 'Ekonomi',
         from_city       TEXT NOT NULL,
         to_city         TEXT NOT NULL,
         departure       TEXT NOT NULL,
@@ -53,6 +53,21 @@ async function main() {
     ],
     'write'
   );
+
+  // Migrate databases created before these columns existed. Safe to re-run —
+  // a duplicate-column error just means the migration already applied.
+  const migrations = [
+    `ALTER TABLE schedules ADD COLUMN class TEXT NOT NULL DEFAULT 'Ekonomi'`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await client.execute(sql);
+      console.log(`Migration applied: ${sql}`);
+    } catch (err) {
+      if (!/duplicate column name/i.test(String(err.message))) throw err;
+    }
+  }
+
   console.log('Schema ready (cities, buses, schedules).');
 
   const { cities } = readSeed('cities.json');
@@ -69,18 +84,19 @@ async function main() {
   }
   for (const b of buses) {
     await client.execute({
-      sql: 'INSERT OR IGNORE INTO buses (id, po_name, po_phone, amenities) VALUES (?, ?, ?, ?)',
-      args: [b.id, b.poName, b.poPhone ?? '', JSON.stringify(b.amenities ?? [])],
+      sql: 'INSERT OR IGNORE INTO buses (id, po_name, amenities) VALUES (?, ?, ?)',
+      args: [b.id, b.poName, JSON.stringify(b.amenities ?? [])],
     });
   }
   for (const s of schedules) {
     await client.execute({
       sql: `INSERT OR IGNORE INTO schedules
-        (id, bus_id, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, stops)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, bus_id, class, from_city, to_city, departure, arrival, duration, price, seats_available, seats_total, stops)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         s.id,
         s.busId,
+        s.busClass ?? 'Ekonomi',
         s.from,
         s.to,
         s.departure,

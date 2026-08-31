@@ -18,8 +18,8 @@ export async function GET(): Promise<NextResponse<BusOperator[] | { error: strin
 
 export async function POST(req: Request): Promise<NextResponse<BusOperator | { error: string }>> {
   try {
-    const body = (await req.json()) as { poName?: unknown; poPhone?: unknown };
-    const { poName, poPhone } = body;
+    const body = (await req.json()) as { poName?: unknown };
+    const { poName } = body;
 
     if (typeof poName !== 'string' || !poName.trim()) {
       return NextResponse.json({ error: 'Nama PO Bis wajib diisi' }, { status: 400 });
@@ -27,7 +27,6 @@ export async function POST(req: Request): Promise<NextResponse<BusOperator | { e
 
     const created = await createBusOperator({
       poName: poName.trim(),
-      poPhone: typeof poPhone === 'string' ? poPhone.trim() : '',
     });
     return NextResponse.json(created, { status: 201 });
   } catch (err) {
