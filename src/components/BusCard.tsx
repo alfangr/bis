@@ -71,7 +71,7 @@ export const BusCard = ({ bus }: BusCardProps) => {
             </p>
             {!bus.officialTo && bus.stops && bus.stops.length > 0 && (
               <p className="mt-0.5 text-center text-[10px] text-muted-foreground/70">
-                Transit: {bus.stops.map((s) => s.city).join(', ')}
+                Transit: {bus.stops.map((s) => (s.time ? `${s.city} (${s.time})` : s.city)).join(', ')}
               </p>
             )}
           </div>

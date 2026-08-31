@@ -125,6 +125,7 @@ const BusOperatorFormFields = ({
 
 type BusStopFormValue = {
   city: string;
+  time: string;
   price: number;
 };
 
@@ -158,7 +159,7 @@ const ScheduleFormFields = ({
   };
 
   const addStop = () => {
-    onChange({ ...value, stops: [...value.stops, { city: '', price: 0 }] });
+    onChange({ ...value, stops: [...value.stops, { city: '', time: '', price: 0 }] });
   };
 
   const removeStop = (index: number) => {
@@ -297,35 +298,44 @@ const ScheduleFormFields = ({
         {value.stops.length > 0 && (
           <div className="space-y-2 pt-1">
             {value.stops.map((stop, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   value={stop.city}
                   onChange={(e) => updateStop(index, { city: e.target.value })}
                   placeholder="Contoh: Pasuruan, SPBU Purwosari, dll"
-                  className="flex-1"
+                  className="sm:flex-1"
                 />
-                <div className="relative w-36">
-                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
-                    Rp
-                  </span>
+                <div className="flex gap-2">
                   <Input
-                    inputMode="numeric"
-                    value={formatNumber(stop.price)}
-                    onChange={(e) => updateStop(index, { price: parseNumber(e.target.value) })}
-                    className="pl-10 tabular-nums"
-                    placeholder="10.000"
+                    type="time"
+                    value={stop.time}
+                    onChange={(e) => updateStop(index, { time: e.target.value })}
+                    className="w-32 shrink-0"
+                    aria-label="Jam tiba di titik berhenti"
                   />
+                  <div className="relative w-36 shrink-0">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-medium text-muted-foreground">
+                      Rp
+                    </span>
+                    <Input
+                      inputMode="numeric"
+                      value={formatNumber(stop.price)}
+                      onChange={(e) => updateStop(index, { price: parseNumber(e.target.value) })}
+                      className="pl-10 tabular-nums"
+                      placeholder="10.000"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeStop(index)}
+                    className="h-9 w-9 shrink-0 hover:text-destructive"
+                    aria-label="Hapus titik berhenti"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeStop(index)}
-                  className="h-9 w-9 shrink-0 hover:text-destructive"
-                  aria-label="Hapus titik berhenti"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             ))}
           </div>
@@ -458,7 +468,9 @@ export default function AdminDashboard() {
         departure: s.departure,
         arrival: s.arrival,
         price: s.price,
-        stops: s.stops ? s.stops.map((st) => ({ city: st.city, price: st.price })) : [],
+        stops: s.stops
+          ? s.stops.map((st) => ({ city: st.city, time: st.time ?? '', price: st.price }))
+          : [],
       });
     }
   };
@@ -524,7 +536,7 @@ export default function AdminDashboard() {
         }
         const stops = scheduleForm.stops
           .filter((s) => s.city.trim())
-          .map((s) => ({ city: s.city.trim(), price: s.price }));
+          .map((s) => ({ city: s.city.trim(), time: s.time.trim() || undefined, price: s.price }));
         const payload = { ...scheduleForm, stops };
         if (modalMode === 'create') {
           const created = await fetchJson<Bus>(`${API_BASE}/schedules`, {
@@ -1049,7 +1061,7 @@ export default function AdminDashboard() {
                               <div className="flex flex-wrap gap-1">
                                 {schedule.stops.map((s) => (
                                   <Badge key={s.city} variant="outline" className="font-normal">
-                                    {s.city} · Rp{s.price.toLocaleString('id-ID')}
+                                    {s.city} {s.time && `· ${s.time}`} · Rp{s.price.toLocaleString('id-ID')}
                                   </Badge>
                                 ))}
                               </div>

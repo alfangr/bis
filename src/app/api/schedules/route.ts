@@ -12,11 +12,12 @@ const parseStops = (value: unknown): BusStop[] | undefined => {
   if (!Array.isArray(value)) return undefined;
   const stops = value
     .filter(
-      (s): s is { city: unknown; price: unknown } =>
+      (s): s is { city: unknown; time?: unknown; price: unknown } =>
         typeof s === 'object' && s !== null
     )
     .map((s) => ({
       city: typeof s.city === 'string' ? s.city.trim() : '',
+      time: typeof s.time === 'string' && s.time.trim() ? s.time.trim() : undefined,
       price: typeof s.price === 'number' ? s.price : 0,
     }))
     .filter((s) => s.city !== '');

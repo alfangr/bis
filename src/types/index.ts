@@ -6,6 +6,8 @@ export interface BusSeats {
 export interface BusStop {
   city: string;
   price: number;
+  /** Arrival time at this stop (HH:MM). Optional — falls back to the schedule's arrival. */
+  time?: string;
 }
 
 export type BusClass = 'Ekonomi' | 'Patas';
