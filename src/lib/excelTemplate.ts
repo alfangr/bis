@@ -17,6 +17,22 @@ const styleHeaderRow = (row: ExcelJS.Row) => {
   row.height = 22;
 };
 
+// Shows an Excel "input message" tooltip when the cell is selected — unlike
+// cell notes/comments, this lives entirely inside sheet.xml (no separate
+// comments/vmlDrawing relationship parts), so it survives being opened and
+// re-saved by real Excel without tripping exceljs's comments reconciler.
+const addHint = (cell: ExcelJS.Cell, message: string) => {
+  cell.dataValidation = {
+    type: 'textLength',
+    operator: 'greaterThanOrEqual',
+    formulae: [0],
+    allowBlank: true,
+    showInputMessage: true,
+    promptTitle: 'Contoh',
+    prompt: message,
+  };
+};
+
 const GUIDE_LINES = [
   { text: 'PANDUAN IMPORT DATA — INFORMAKITA BIS', bold: true, size: 13 },
   { text: '' },
@@ -59,14 +75,14 @@ export const buildImportTemplate = async (): Promise<ExcelJS.Workbook> => {
   ];
   styleHeaderRow(cities.getRow(1));
   cities.views = [{ state: 'frozen', ySplit: 1 }];
-  cities.getCell('A1').note = 'Contoh: Malang';
-  cities.getCell('B1').note = 'Contoh: Jawa Timur';
+  addHint(cities.getCell('A1'), 'Malang');
+  addHint(cities.getCell('B1'), 'Jawa Timur');
 
   const buses = wb.addWorksheet('PO Bis');
   buses.columns = [{ header: 'Nama PO Bis', key: 'poName', width: 32 }];
   styleHeaderRow(buses.getRow(1));
   buses.views = [{ state: 'frozen', ySplit: 1 }];
-  buses.getCell('A1').note = 'Contoh: Bis Tentrem';
+  addHint(buses.getCell('A1'), 'Bis Tentrem');
 
   const schedules = wb.addWorksheet('Jadwal');
   schedules.columns = [
@@ -81,14 +97,14 @@ export const buildImportTemplate = async (): Promise<ExcelJS.Workbook> => {
   ];
   styleHeaderRow(schedules.getRow(1));
   schedules.views = [{ state: 'frozen', ySplit: 1 }];
-  schedules.getCell('A1').note = 'Contoh: Bis Tentrem — harus cocok dengan sheet "PO Bis"';
-  schedules.getCell('B1').note = 'Isi persis: Ekonomi atau Patas';
-  schedules.getCell('C1').note = 'Contoh: Malang';
-  schedules.getCell('D1').note = 'Contoh: Surabaya';
-  schedules.getCell('E1').note = 'Format 24 jam, contoh: 05:30';
-  schedules.getCell('F1').note = 'Format 24 jam, contoh: 07:45';
-  schedules.getCell('G1').note = 'Angka saja, contoh: 25000';
-  schedules.getCell('H1').note = 'Opsional. Contoh: Pasuruan:10000; Bangil:15000';
+  addHint(schedules.getCell('A1'), 'Bis Tentrem — harus cocok dengan sheet "PO Bis"');
+  addHint(schedules.getCell('B1'), 'Isi persis: Ekonomi atau Patas');
+  addHint(schedules.getCell('C1'), 'Malang');
+  addHint(schedules.getCell('D1'), 'Surabaya');
+  addHint(schedules.getCell('E1'), 'Format 24 jam, contoh: 05:30');
+  addHint(schedules.getCell('F1'), 'Format 24 jam, contoh: 07:45');
+  addHint(schedules.getCell('G1'), 'Angka saja, contoh: 25000');
+  addHint(schedules.getCell('H1'), 'Opsional. Contoh: Pasuruan:10000; Bangil:15000');
 
   schedules.getColumn('departure').numFmt = '@';
   schedules.getColumn('arrival').numFmt = '@';
