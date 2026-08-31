@@ -17,6 +17,9 @@ import {
   Download,
   Upload,
   FileSpreadsheet,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +39,13 @@ import type { Bus, BusClass, BusOperator, City } from '@/types';
 import type { ImportSummary } from '@/lib/excelImport';
 
 const BUS_CLASSES: BusClass[] = ['Ekonomi', 'Patas'];
+const PAGE_SIZE = 10;
+
+const SEARCH_PLACEHOLDER: Record<AdminTab, string> = {
+  cities: 'Cari nama kota atau provinsi...',
+  buses: 'Cari nama PO bis...',
+  schedules: 'Cari PO bis, kelas, atau rute...',
+};
 
 type AdminTab = 'cities' | 'buses' | 'schedules';
 type ModalMode = 'create' | 'edit' | null;
@@ -367,6 +377,9 @@ export default function AdminDashboard() {
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
     void Promise.all([
       loadData('cities', true),
@@ -409,6 +422,8 @@ export default function AdminDashboard() {
     setTab(next);
     setSuccess(null);
     setError(null);
+    setSearch('');
+    setPage(1);
     await loadData(next);
   };
 
@@ -617,6 +632,38 @@ export default function AdminDashboard() {
     [cities, busOperators, schedules]
   );
   const statsReady = initialLoadDone.cities && initialLoadDone.buses && initialLoadDone.schedules;
+
+  const searchQuery = search.trim().toLowerCase();
+  const filteredCities = useMemo(() => {
+    if (!searchQuery) return cities;
+    return cities.filter(
+      (c) => c.name.toLowerCase().includes(searchQuery) || c.province.toLowerCase().includes(searchQuery)
+    );
+  }, [cities, searchQuery]);
+  const filteredBuses = useMemo(() => {
+    if (!searchQuery) return busOperators;
+    return busOperators.filter((b) => b.poName.toLowerCase().includes(searchQuery));
+  }, [busOperators, searchQuery]);
+  const filteredSchedules = useMemo(() => {
+    if (!searchQuery) return schedules;
+    return schedules.filter(
+      (s) =>
+        s.poName.toLowerCase().includes(searchQuery) ||
+        s.busClass.toLowerCase().includes(searchQuery) ||
+        s.from.toLowerCase().includes(searchQuery) ||
+        s.to.toLowerCase().includes(searchQuery)
+    );
+  }, [schedules, searchQuery]);
+
+  const filteredCount =
+    tab === 'cities' ? filteredCities.length : tab === 'buses' ? filteredBuses.length : filteredSchedules.length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, filteredCount);
+  const pagedCities = filteredCities.slice(pageStart, pageStart + PAGE_SIZE);
+  const pagedBuses = filteredBuses.slice(pageStart, pageStart + PAGE_SIZE);
+  const pagedSchedules = filteredSchedules.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -848,6 +895,18 @@ export default function AdminDashboard() {
                 Tambah {tab === 'cities' ? 'Kota' : tab === 'buses' ? 'Bis' : 'Jadwal'}
               </Button>
             </div>
+            <div className="relative mt-4 max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder={SEARCH_PLACEHOLDER[tab]}
+                className="pl-9"
+              />
+            </div>
           </CardHeader>
           <Separator className="my-6" />
           <CardContent className="pt-0">
@@ -874,6 +933,18 @@ export default function AdminDashboard() {
                   Klik tombol &quot;Tambah&quot; untuk memasukkan data pertama.
                 </p>
               </div>
+            ) : filteredCount === 0 ? (
+              <div className="text-center py-16 text-muted-foreground">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <Search className="h-8 w-8" />
+                </div>
+                <h3 className="font-semibold text-card-foreground mb-1">
+                  Tidak ada hasil
+                </h3>
+                <p className="text-sm">
+                  Tidak ditemukan data yang cocok dengan &quot;{search}&quot;.
+                </p>
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-border -mx-1 sm:mx-0">
                 {tab === 'cities' && (
@@ -887,7 +958,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {cities.map((city) => (
+                      {pagedCities.map((city) => (
                         <tr key={city.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{city.id}</td>
                           <td className="px-4 py-3 font-medium text-card-foreground flex items-center gap-2">
@@ -920,7 +991,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {busOperators.map((bus) => (
+                      {pagedBuses.map((bus) => (
                         <tr key={bus.id} className="hover:bg-muted/30">
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{bus.id}</td>
                           <td className="px-4 py-3 font-medium text-card-foreground">{bus.poName}</td>
@@ -954,7 +1025,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {schedules.map((schedule) => (
+                      {pagedSchedules.map((schedule) => (
                         <tr key={schedule.id} className="hover:bg-muted/30 align-top">
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{schedule.id}</td>
                           <td className="px-4 py-3">
@@ -1003,6 +1074,41 @@ export default function AdminDashboard() {
                       ))}
                     </tbody>
                   </table>
+                )}
+              </div>
+            )}
+            {filteredCount > 0 && (
+              <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
+                <p className="text-xs text-muted-foreground">
+                  Menampilkan {pageStart + 1}-{pageEnd} dari {filteredCount} data
+                  {search && ` (disaring dari ${currentList.length})`}
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      aria-label="Halaman sebelumnya"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Halaman {currentPage} dari {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      aria-label="Halaman berikutnya"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
