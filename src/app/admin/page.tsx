@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MapPin,
   Bus as BusIcon,
@@ -14,6 +14,9 @@ import {
   LayoutDashboard,
   Clock,
   Banknote,
+  Download,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Bus, BusClass, BusOperator, City } from '@/types';
+import type { ImportSummary } from '@/lib/excelImport';
 
 const BUS_CLASSES: BusClass[] = ['Ekonomi', 'Patas'];
 
@@ -357,6 +361,12 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportSummary | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     void Promise.all([
       loadData('cities', true),
@@ -555,6 +565,39 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    window.location.href = `${API_BASE}/import/template`;
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const res = await fetch(`${API_BASE}/import`, { method: 'POST', body: formData });
+      const data = (await res.json()) as ImportSummary | ApiError;
+      if (!res.ok) {
+        throw new Error((data as ApiError).error ?? 'Import gagal');
+      }
+      setImportResult(data as ImportSummary);
+      setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setInitialLoadDone({ cities: false, buses: false, schedules: false });
+      await Promise.all([
+        loadData('cities', true),
+        loadData('buses', true),
+        loadData('schedules', true),
+      ]);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import gagal');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const modalTitle =
     tab === 'cities'
       ? modalMode === 'create'
@@ -613,6 +656,92 @@ export default function AdminDashboard() {
             </Button>
           </div>
         </div>
+
+        <Card className="mb-6 border-border">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <FileSpreadsheet className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-heading text-sm font-bold text-card-foreground">
+                  Import Data dari Excel
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Unduh template, isi data kota/PO bis/jadwal, lalu unggah kembali di sini.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="gap-2">
+                <Download className="h-4 w-4" />
+                Unduh Template
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="max-w-[180px] justify-start gap-2 truncate"
+              >
+                <Upload className="h-4 w-4 shrink-0" />
+                <span className="truncate">{importFile ? importFile.name : 'Pilih File'}</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleImport}
+                disabled={!importFile || importing}
+                className="gap-2"
+              >
+                {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+                Import
+              </Button>
+            </div>
+          </CardContent>
+          {(importResult || importError) && (
+            <CardContent className="pt-0">
+              {importError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{importError}</AlertDescription>
+                </Alert>
+              )}
+              {importResult && (
+                <Alert className="border-green-500/50 bg-green-50 text-green-800">
+                  <AlertDescription>
+                    <p className="font-medium">
+                      Import selesai: {importResult.cities.created} kota, {importResult.buses.created}{' '}
+                      PO bis, {importResult.schedules.created} jadwal berhasil ditambahkan.
+                    </p>
+                    {(importResult.cities.skipped > 0 || importResult.buses.skipped > 0) && (
+                      <p className="mt-1 text-xs">
+                        Dilewati karena sudah ada: {importResult.cities.skipped} kota,{' '}
+                        {importResult.buses.skipped} PO bis.
+                      </p>
+                    )}
+                    {importResult.schedules.errors.length > 0 && (
+                      <div className="mt-2 max-h-40 overflow-y-auto rounded-md bg-white/60 p-2 text-xs">
+                        <p className="mb-1 font-medium text-destructive">
+                          {importResult.schedules.errors.length} baris jadwal gagal diimport:
+                        </p>
+                        <ul className="list-disc space-y-0.5 pl-4">
+                          {importResult.schedules.errors.map((e) => (
+                            <li key={e}>{e}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-background border-primary/20">
