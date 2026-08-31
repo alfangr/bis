@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react';
 import {
   MapPin,
   Bus as BusIcon,
@@ -20,6 +22,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +40,81 @@ import {
 } from '@/components/ui/select';
 import type { Bus, BusClass, BusOperator, City } from '@/types';
 import type { ImportSummary } from '@/lib/excelImport';
+
+const GoogleIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path
+      fill="#4285F4"
+      d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.44c-.28 1.48-1.13 2.73-2.4 3.58v2.98h3.88c2.27-2.09 3.57-5.17 3.57-8.8z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.92l-3.88-2.98c-1.08.72-2.45 1.15-4.05 1.15-3.11 0-5.75-2.1-6.69-4.93H1.29v3.09C3.26 21.3 7.31 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.31 14.32c-.24-.72-.38-1.49-.38-2.32s.14-1.6.38-2.32V6.59H1.29A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.29 5.41l4.02-3.09z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.94 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.59l4.02 3.09c.94-2.83 3.58-4.93 6.69-4.93z"
+    />
+  </svg>
+);
+
+const SignInScreen = () => {
+  const searchParams = useSearchParams();
+  const authError = searchParams.get('error');
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+      <Card className="w-full max-w-sm border-border">
+        <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <LayoutDashboard className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="font-heading text-xl font-bold text-card-foreground">Dashboard Admin</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Login dengan akun Google admin untuk mengakses halaman ini.
+            </p>
+          </div>
+          {authError && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {authError === 'AccessDenied'
+                  ? 'Akun Google ini tidak terdaftar sebagai admin.'
+                  : 'Login gagal, silakan coba lagi.'}
+              </AlertDescription>
+            </Alert>
+          )}
+          <Button onClick={() => signIn('google', { callbackUrl: '/admin' })} className="w-full gap-2">
+            <GoogleIcon className="h-4 w-4" />
+            Login dengan Google
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const AdminGate = ({ children }: { children: React.ReactNode }) => {
+  const { data: session, status } = useSession();
+
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <SignInScreen />;
+  }
+
+  return <>{children}</>;
+};
 
 const BUS_CLASSES: BusClass[] = ['Ekonomi', 'Patas'];
 const PAGE_SIZE = 10;
@@ -358,7 +436,8 @@ const EMPTY_SCHEDULE: ScheduleFormValue = {
   stops: [],
 };
 
-export default function AdminDashboard() {
+function AdminDashboard() {
+  const { data: session } = useSession();
   const [tab, setTab] = useState<AdminTab>('cities');
 
   const [cities, setCities] = useState<City[]>([]);
@@ -696,23 +775,38 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-            <Button
-              onClick={() => {
-                setInitialLoadDone({ cities: false, buses: false, schedules: false });
-                void Promise.all([
-                  loadData('cities', true),
-                  loadData('buses', true),
-                  loadData('schedules', true),
-                ]);
-              }}
-              variant="outline"
-              className="gap-2"
-              disabled={loading}
-            >
-              <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+          <div className="flex flex-col items-start gap-2 self-start sm:items-end sm:self-auto">
+            {session?.user?.email && (
+              <p className="text-xs text-muted-foreground">
+                Login sebagai <span className="font-medium text-card-foreground">{session.user.email}</span>
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  setInitialLoadDone({ cities: false, buses: false, schedules: false });
+                  void Promise.all([
+                    loadData('cities', true),
+                    loadData('buses', true),
+                    loadData('schedules', true),
+                  ]);
+                }}
+                variant="outline"
+                className="gap-2"
+                disabled={loading}
+              >
+                <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </Button>
+              <Button
+                onClick={() => signOut({ callbackUrl: '/admin' })}
+                variant="outline"
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1178,5 +1272,23 @@ export default function AdminDashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <SessionProvider>
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-muted/30">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        }
+      >
+        <AdminGate>
+          <AdminDashboard />
+        </AdminGate>
+      </Suspense>
+    </SessionProvider>
   );
 }
