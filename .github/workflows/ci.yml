@@ -28,3 +28,40 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Pasang Chromium + dependensi sistem yang dibutuhkannya di runner Linux.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # Playwright menyalakan `next dev` sendiri (lihat playwright.config.ts),
+      # jadi tidak perlu menjalankan server secara manual di sini.
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      # Unggah laporan meski test gagal, supaya bisa dianalisis.
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
